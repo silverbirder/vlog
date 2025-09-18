@@ -19,8 +19,21 @@ type RecorderCardProps = {
   onReset?: () => void;
 };
 
+type TauriNotificationModule = typeof import("@tauri-apps/plugin-notification");
+
 const hasMediaSupport =
   typeof navigator !== "undefined" && Boolean(navigator.mediaDevices);
+
+function isTauriEnvironment() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const globalWindow = window as unknown as {
+    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
+  };
+  return Boolean(globalWindow.__TAURI__ || globalWindow.__TAURI_INTERNALS__);
+}
 
 function formatDuration(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
@@ -209,6 +222,22 @@ function App() {
   const autoStopDurationSecondsRef = useRef<number | null>(null);
   const [autoStopDeadline, setAutoStopDeadline] = useState<Date | null>(null);
   const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
+  const [tauriNotificationPermission, setTauriNotificationPermission] =
+    useState<"unknown" | "granted" | "denied">("unknown");
+
+  const loadTauriNotification =
+    useCallback(async (): Promise<TauriNotificationModule | null> => {
+      if (!isTauriEnvironment()) {
+        return null;
+      }
+      try {
+        const module = await import("@tauri-apps/plugin-notification");
+        return module;
+      } catch (err) {
+        console.warn("Failed to load Tauri notification plugin", err);
+        return null;
+      }
+    }, []);
 
   const autoStopDurationSeconds = useMemo(() => {
     const minutesRaw = Number(autoStopMinutesInput);
@@ -256,44 +285,93 @@ function App() {
     setAutoStopDeadline(null);
   }, []);
 
-  const notifyAutoStop = useCallback((durationSeconds: number) => {
-    if (typeof window === "undefined") {
-      return;
-    }
+  const notifyAutoStop = useCallback(
+    async (durationSeconds: number) => {
+      const label = formatDuration(durationSeconds);
+      const title = "録画を停止しました";
+      const body = `指定した${label}が経過したため、自動停止しました。`;
 
-    const label = formatDuration(durationSeconds);
-    const body = `指定した${label}が経過したため、自動停止しました。`;
+      const showFallbackAlert = () => {
+        if (
+          typeof window !== "undefined" &&
+          typeof window.alert === "function"
+        ) {
+          window.alert(body);
+        }
+      };
 
-    if ("Notification" in window) {
+      const tauriNotification = await loadTauriNotification();
+      if (tauriNotification) {
+        try {
+          const granted = await tauriNotification.isPermissionGranted();
+          if (granted) {
+            await tauriNotification.sendNotification({ title, body });
+            return;
+          }
+          setTauriNotificationPermission("denied");
+        } catch (err) {
+          console.warn("Failed to send Tauri notification", err);
+        }
+      }
+
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        showFallbackAlert();
+        return;
+      }
+
       if (Notification.permission === "granted") {
-        new Notification("録画を停止しました", { body });
+        new Notification(title, { body });
         return;
       }
 
       if (Notification.permission !== "denied") {
         Notification.requestPermission().then((permission) => {
           if (permission === "granted") {
-            new Notification("録画を停止しました", { body });
+            new Notification(title, { body });
           } else {
-            window.alert(body);
+            showFallbackAlert();
           }
         });
         return;
       }
+
+      showFallbackAlert();
+    },
+    [loadTauriNotification, setTauriNotificationPermission]
+  );
+
+  const ensureNotificationPermission = useCallback(async () => {
+    const tauriNotification = await loadTauriNotification();
+    if (tauriNotification) {
+      try {
+        if (await tauriNotification.isPermissionGranted()) {
+          setTauriNotificationPermission("granted");
+          return;
+        }
+        const permission = await tauriNotification.requestPermission();
+        if (permission === "granted") {
+          setTauriNotificationPermission("granted");
+        } else if (permission === "denied") {
+          setTauriNotificationPermission("denied");
+        }
+        return;
+      } catch (err) {
+        console.warn("Failed to request Tauri notification permission", err);
+      }
     }
 
-    window.alert(body);
-  }, []);
-
-  const ensureNotificationPermission = useCallback(() => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       return;
     }
 
     if (Notification.permission === "default") {
-      Notification.requestPermission().catch(() => undefined);
+      try {
+        await Notification.requestPermission();
+      } catch (err) {
+        console.warn("Failed to request browser notification permission", err);
+      }
     }
-  }, []);
+  }, [loadTauriNotification]);
 
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
@@ -419,7 +497,12 @@ function App() {
       if (options?.auto && secondsForNotification) {
         const label = formatDuration(secondsForNotification);
         const baseMessage = `指定した${label}が経過したため、自動的に停止しました。`;
-        if (
+
+        if (tauriNotificationPermission === "denied" && isTauriEnvironment()) {
+          setAutoStopMessage(
+            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`
+          );
+        } else if (
           typeof window !== "undefined" &&
           "Notification" in window &&
           Notification.permission === "denied"
@@ -430,7 +513,8 @@ function App() {
         } else {
           setAutoStopMessage(baseMessage);
         }
-        notifyAutoStop(secondsForNotification);
+
+        void notifyAutoStop(secondsForNotification);
       } else if (!options?.auto) {
         setAutoStopMessage(null);
       }
@@ -439,6 +523,7 @@ function App() {
       autoStopDurationSecondsRef,
       clearAutoStopTimer,
       controllerEntries,
+      tauriNotificationPermission,
       notifyAutoStop,
     ]
   );
@@ -448,7 +533,9 @@ function App() {
       return;
     }
 
-    ensureNotificationPermission();
+    await ensureNotificationPermission().catch((err) => {
+      console.warn("Notification permission check failed", err);
+    });
     clearAutoStopTimer();
     setAutoStopMessage(null);
     setIsStartingAll(true);
