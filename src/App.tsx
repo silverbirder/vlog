@@ -22,6 +22,27 @@ type RecorderCardProps = {
 const hasMediaSupport =
   typeof navigator !== "undefined" && Boolean(navigator.mediaDevices);
 
+function formatDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return "0秒";
+  }
+
+  const roundedSeconds = Math.round(totalSeconds);
+
+  if (roundedSeconds < 60) {
+    return `${roundedSeconds}秒`;
+  }
+
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
+
+  if (seconds === 0) {
+    return `${minutes}分`;
+  }
+
+  return `${minutes}分${seconds}秒`;
+}
+
 function VideoStream({
   stream,
   mirrored,
@@ -127,7 +148,9 @@ function RecorderCard({
             checked={enabled}
             onChange={(event) => {
               const checked =
-                (event.target instanceof HTMLInputElement && event.target.checked) || false;
+                (event.target instanceof HTMLInputElement &&
+                  event.target.checked) ||
+                false;
               onToggle(checked);
             }}
             disabled={toggleDisabled}
@@ -180,6 +203,97 @@ function App() {
     audio: false,
   });
   const [isStartingAll, setIsStartingAll] = useState(false);
+  const [autoStopMinutesInput, setAutoStopMinutesInput] = useState("15");
+  const [autoStopSecondsInput, setAutoStopSecondsInput] = useState("0");
+  const autoStopTimerRef = useRef<number | null>(null);
+  const autoStopDurationSecondsRef = useRef<number | null>(null);
+  const [autoStopDeadline, setAutoStopDeadline] = useState<Date | null>(null);
+  const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
+
+  const autoStopDurationSeconds = useMemo(() => {
+    const minutesRaw = Number(autoStopMinutesInput);
+    const secondsRaw = Number(autoStopSecondsInput);
+
+    if (
+      Number.isNaN(minutesRaw) ||
+      minutesRaw < 0 ||
+      !Number.isFinite(minutesRaw) ||
+      Number.isNaN(secondsRaw) ||
+      secondsRaw < 0 ||
+      !Number.isFinite(secondsRaw)
+    ) {
+      return null;
+    }
+
+    const minutes = Math.floor(minutesRaw);
+    const seconds = Math.floor(secondsRaw);
+
+    if (seconds >= 60) {
+      return minutes * 60 + 59;
+    }
+
+    const totalSeconds = minutes * 60 + seconds;
+
+    return totalSeconds > 0 ? totalSeconds : null;
+  }, [autoStopMinutesInput, autoStopSecondsInput]);
+
+  const autoStopDurationMs = useMemo(() => {
+    if (!autoStopDurationSeconds) {
+      return null;
+    }
+    return autoStopDurationSeconds * 1000;
+  }, [autoStopDurationSeconds]);
+
+  const clearAutoStopTimer = useCallback(() => {
+    if (autoStopTimerRef.current !== null) {
+      const timeoutId = autoStopTimerRef.current;
+      if (typeof window !== "undefined") {
+        window.clearTimeout(timeoutId);
+      }
+      autoStopTimerRef.current = null;
+    }
+    autoStopDurationSecondsRef.current = null;
+    setAutoStopDeadline(null);
+  }, []);
+
+  const notifyAutoStop = useCallback((durationSeconds: number) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const label = formatDuration(durationSeconds);
+    const body = `指定した${label}が経過したため、自動停止しました。`;
+
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") {
+        new Notification("録画を停止しました", { body });
+        return;
+      }
+
+      if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            new Notification("録画を停止しました", { body });
+          } else {
+            window.alert(body);
+          }
+        });
+        return;
+      }
+    }
+
+    window.alert(body);
+  }, []);
+
+  const ensureNotificationPermission = useCallback(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return;
+    }
+
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => undefined);
+    }
+  }, []);
 
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
@@ -274,13 +388,74 @@ function App() {
     ({ controller }) => controller.mediaUrl
   );
 
+  const scheduledAutoStopSeconds =
+    autoStopDurationSecondsRef.current ?? autoStopDurationSeconds ?? null;
+
+  useEffect(() => {
+    if (!isAnyRecording && autoStopTimerRef.current !== null) {
+      clearAutoStopTimer();
+    }
+  }, [clearAutoStopTimer, isAnyRecording]);
+
+  useEffect(() => {
+    return () => {
+      clearAutoStopTimer();
+    };
+  }, [clearAutoStopTimer]);
+
+  const stopAll = useCallback(
+    (options?: { auto?: boolean; durationSeconds?: number }) => {
+      const secondsForNotification =
+        options?.durationSeconds ?? autoStopDurationSecondsRef.current ?? null;
+
+      clearAutoStopTimer();
+
+      controllerEntries.forEach(({ controller }) => {
+        if (controller.isRecording) {
+          controller.stop();
+        }
+      });
+
+      if (options?.auto && secondsForNotification) {
+        const label = formatDuration(secondsForNotification);
+        const baseMessage = `指定した${label}が経過したため、自動的に停止しました。`;
+        if (
+          typeof window !== "undefined" &&
+          "Notification" in window &&
+          Notification.permission === "denied"
+        ) {
+          setAutoStopMessage(
+            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`
+          );
+        } else {
+          setAutoStopMessage(baseMessage);
+        }
+        notifyAutoStop(secondsForNotification);
+      } else if (!options?.auto) {
+        setAutoStopMessage(null);
+      }
+    },
+    [
+      autoStopDurationSecondsRef,
+      clearAutoStopTimer,
+      controllerEntries,
+      notifyAutoStop,
+    ]
+  );
+
   const startAll = useCallback(async () => {
     if (isStartingAll || isAnyRecording || !isAnyEnabled) {
       return;
     }
 
+    ensureNotificationPermission();
+    clearAutoStopTimer();
+    setAutoStopMessage(null);
     setIsStartingAll(true);
+
     try {
+      let didStartAny = false;
+
       for (const { key, controller } of controllerEntries) {
         if (!enabledSources[key]) {
           controller.reset();
@@ -289,32 +464,47 @@ function App() {
 
         try {
           await controller.start();
+          didStartAny = true;
         } catch (err) {
           console.warn(`${String(key)} start failed`, err);
         }
+      }
+
+      if (
+        didStartAny &&
+        autoStopDurationMs &&
+        autoStopDurationSeconds &&
+        typeof window !== "undefined"
+      ) {
+        autoStopDurationSecondsRef.current = autoStopDurationSeconds;
+        const timeoutId = window.setTimeout(() => {
+          stopAll({ auto: true, durationSeconds: autoStopDurationSeconds });
+        }, autoStopDurationMs);
+        autoStopTimerRef.current = timeoutId;
+        setAutoStopDeadline(new Date(Date.now() + autoStopDurationMs));
       }
     } finally {
       setIsStartingAll(false);
     }
   }, [
+    autoStopDurationMs,
+    autoStopDurationSeconds,
+    autoStopDurationSecondsRef,
+    clearAutoStopTimer,
     controllerEntries,
     enabledSources,
     isAnyEnabled,
     isAnyRecording,
     isStartingAll,
+    ensureNotificationPermission,
+    stopAll,
   ]);
 
-  const stopAll = useCallback(() => {
-    controllerEntries.forEach(({ controller }) => {
-      if (controller.isRecording) {
-        controller.stop();
-      }
-    });
-  }, [controllerEntries]);
-
   const resetAll = useCallback(() => {
+    clearAutoStopTimer();
+    setAutoStopMessage(null);
     controllerEntries.forEach(({ controller }) => controller.reset());
-  }, [controllerEntries]);
+  }, [clearAutoStopTimer, controllerEntries]);
 
   const downloadAll = useCallback(() => {
     controllerEntries.forEach(({ controller, defaultDownloadName }) => {
@@ -386,6 +576,72 @@ function App() {
           </label>
         </div>
 
+        <div className="auto-stop-controls">
+          <label htmlFor="auto-stop-minutes">
+            <span>自動停止タイマー（分）</span>
+            <input
+              id="auto-stop-minutes"
+              type="number"
+              min={0}
+              step={1}
+              value={autoStopMinutesInput}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                const { value } = event.target;
+                if (value === "") {
+                  setAutoStopMinutesInput("");
+                  return;
+                }
+                const numeric = Number(value);
+                if (Number.isNaN(numeric)) {
+                  return;
+                }
+                const normalized = Math.max(0, Math.floor(numeric));
+                setAutoStopMinutesInput(String(normalized));
+              }}
+              disabled={isStartingAll}
+            />
+          </label>
+          <label htmlFor="auto-stop-seconds">
+            <span>秒</span>
+            <input
+              id="auto-stop-seconds"
+              type="number"
+              min={0}
+              max={59}
+              step={1}
+              value={autoStopSecondsInput}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                const { value } = event.target;
+                if (value === "") {
+                  setAutoStopSecondsInput("");
+                  return;
+                }
+                const numeric = Number(value);
+                if (Number.isNaN(numeric)) {
+                  return;
+                }
+                const clamped = Math.min(59, Math.max(0, Math.floor(numeric)));
+                setAutoStopSecondsInput(String(clamped));
+              }}
+              disabled={isStartingAll}
+            />
+          </label>
+          <span className="muted auto-stop-note">
+            分・秒を両方 0 にすると無効。変更は次回の開始時に適用されます。
+          </span>
+        </div>
+
+        {autoStopDeadline && scheduledAutoStopSeconds && (
+          <p className="muted auto-stop-deadline">
+            自動停止予定: {autoStopDeadline.toLocaleTimeString()}（
+            {formatDuration(scheduledAutoStopSeconds)}後）
+          </p>
+        )}
+
+        {autoStopMessage && (
+          <p className="auto-stop-message">{autoStopMessage}</p>
+        )}
+
         <div className="global-controls">
           <button
             onClick={startAll}
@@ -395,7 +651,7 @@ function App() {
             まとめて開始
           </button>
           <button
-            onClick={stopAll}
+            onClick={() => stopAll()}
             disabled={!isAnyRecording}
             className="warning"
           >
