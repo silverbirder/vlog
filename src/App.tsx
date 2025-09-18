@@ -20,9 +20,9 @@ type RecorderCardProps = {
 };
 
 type TauriNotificationModule = typeof import("@tauri-apps/plugin-notification");
-
-const hasMediaSupport =
-  typeof navigator !== "undefined" && Boolean(navigator.mediaDevices);
+type TauriMacosPermissionsModule = typeof import(
+  "tauri-plugin-macos-permissions-api"
+);
 
 function isTauriEnvironment() {
   if (typeof window === "undefined") {
@@ -224,6 +224,18 @@ function App() {
   const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
   const [tauriNotificationPermission, setTauriNotificationPermission] =
     useState<"unknown" | "granted" | "denied">("unknown");
+  const [mediaSupportStatus, setMediaSupportStatus] = useState<
+    "pending" | "supported" | "unsupported"
+  >(
+    typeof navigator !== "undefined" && navigator.mediaDevices
+      ? "supported"
+      : "pending"
+  );
+  const [mediaSupportMessage, setMediaSupportMessage] = useState(
+    typeof navigator !== "undefined" && navigator.mediaDevices
+      ? ""
+      : "このマシンはメディアデバイス API をサポートしていません。"
+  );
 
   const loadTauriNotification =
     useCallback(async (): Promise<TauriNotificationModule | null> => {
@@ -238,6 +250,183 @@ function App() {
         return null;
       }
     }, []);
+
+  const loadTauriMacosPermissions =
+    useCallback(async (): Promise<TauriMacosPermissionsModule | null> => {
+      if (!isTauriEnvironment()) {
+        return null;
+      }
+      try {
+        const module = await import("tauri-plugin-macos-permissions-api");
+        return module;
+      } catch (err) {
+        console.warn("Failed to load Tauri macOS permissions plugin", err);
+        return null;
+      }
+    }, []);
+
+  useEffect(() => {
+    if (mediaSupportStatus !== "pending") {
+      return;
+    }
+
+    let disposed = false;
+
+    const evaluateSupport = async () => {
+      const navigatorAvailableInitially =
+        typeof navigator !== "undefined" && navigator.mediaDevices;
+
+      if (navigatorAvailableInitially) {
+        if (!disposed) {
+          setMediaSupportStatus("supported");
+          setMediaSupportMessage("");
+        }
+        return;
+      }
+
+      if (!isTauriEnvironment()) {
+        if (!disposed) {
+          setMediaSupportStatus("unsupported");
+          setMediaSupportMessage(
+            "このマシンはメディアデバイス API をサポートしていません。"
+          );
+        }
+        return;
+      }
+
+      const permissions = await loadTauriMacosPermissions();
+      if (!permissions) {
+        if (!disposed) {
+          setMediaSupportStatus("unsupported");
+          setMediaSupportMessage(
+            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。"
+          );
+        }
+        return;
+      }
+
+      const normalizePermissionResult = (value: unknown): boolean => {
+        if (typeof value === "boolean") {
+          return value;
+        }
+        if (typeof value === "string") {
+          const normalized = value.toLowerCase();
+          return [
+            "granted",
+            "authorized",
+            "authorizedalways",
+            "authorizedwheninuse",
+            "promptallowed",
+          ].includes(normalized);
+        }
+        return false;
+      };
+
+      const ensurePermission = async (
+        check?: () => Promise<unknown>,
+        request?: () => Promise<unknown>
+      ): Promise<boolean> => {
+        try {
+          if (check) {
+            const granted = await check();
+            if (normalizePermissionResult(granted)) {
+              return true;
+            }
+          }
+          if (request) {
+            return normalizePermissionResult(await request());
+          }
+        } catch (err) {
+          console.warn("Failed to ensure macOS permission", err);
+        }
+        return false;
+      };
+
+      const checkScreenPermission =
+        permissions.checkScreenRecordingPermission ??
+        ((permissions as Record<string, unknown>)[
+          "checkScreenCapturePermission"
+        ] as (() => Promise<boolean>) | undefined);
+      const requestScreenPermission =
+        permissions.requestScreenRecordingPermission ??
+        ((permissions as Record<string, unknown>)[
+          "requestScreenCapturePermission"
+        ] as (() => Promise<boolean>) | undefined);
+
+      const [microphoneGranted, cameraGranted, screenGranted] =
+        await Promise.all([
+          ensurePermission(
+            permissions.checkMicrophonePermission
+              ? () => permissions.checkMicrophonePermission()
+              : undefined,
+            permissions.requestMicrophonePermission
+              ? () => permissions.requestMicrophonePermission()
+              : undefined
+          ),
+          ensurePermission(
+            permissions.checkCameraPermission
+              ? () => permissions.checkCameraPermission()
+              : undefined,
+            permissions.requestCameraPermission
+              ? () => permissions.requestCameraPermission()
+              : undefined
+          ),
+          ensurePermission(
+            checkScreenPermission ? () => checkScreenPermission() : undefined,
+            requestScreenPermission
+              ? () => requestScreenPermission()
+              : undefined
+          ),
+        ]);
+
+      const navigatorAvailableAfter =
+        typeof navigator !== "undefined" && navigator.mediaDevices;
+
+      if (disposed) {
+        return;
+      }
+
+      if (navigatorAvailableAfter) {
+        setMediaSupportStatus("supported");
+        if (!microphoneGranted || !cameraGranted || !screenGranted) {
+          const denied = [
+            !microphoneGranted ? "マイク" : null,
+            !cameraGranted ? "カメラ" : null,
+            !screenGranted ? "画面収録" : null,
+          ].filter(Boolean);
+          if (denied.length > 0) {
+            setMediaSupportMessage(
+              `${denied.join("・")}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`
+            );
+          } else {
+            setMediaSupportMessage("");
+          }
+        } else {
+          setMediaSupportMessage("");
+        }
+        return;
+      }
+
+      if (microphoneGranted || cameraGranted || screenGranted) {
+        setMediaSupportStatus("supported");
+        setMediaSupportMessage(
+          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。"
+        );
+        return;
+      }
+
+      setMediaSupportStatus("unsupported");
+      setMediaSupportMessage(
+        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。"
+      );
+    };
+
+    void evaluateSupport();
+
+    return () => {
+      disposed = true;
+    };
+  }, [loadTauriMacosPermissions, mediaSupportStatus]);
 
   const autoStopDurationSeconds = useMemo(() => {
     const minutesRaw = Number(autoStopMinutesInput);
@@ -533,12 +722,15 @@ function App() {
       return;
     }
 
-    await ensureNotificationPermission().catch((err) => {
-      console.warn("Notification permission check failed", err);
-    });
     clearAutoStopTimer();
     setAutoStopMessage(null);
     setIsStartingAll(true);
+
+    const notificationPermissionPromise = ensureNotificationPermission().catch(
+      (err) => {
+        console.warn("Notification permission check failed", err);
+      }
+    );
 
     try {
       let didStartAny = false;
@@ -573,6 +765,8 @@ function App() {
     } finally {
       setIsStartingAll(false);
     }
+
+    await notificationPermissionPromise;
   }, [
     autoStopDurationMs,
     autoStopDurationSeconds,
@@ -601,11 +795,20 @@ function App() {
     });
   }, [controllerEntries]);
 
-  if (!hasMediaSupport) {
+  if (mediaSupportStatus === "pending") {
+    return (
+      <main className="app">
+        <h1>メディアデバイスを確認中...</h1>
+        <p>デスクトップアプリの権限状態を確認しています。</p>
+      </main>
+    );
+  }
+
+  if (mediaSupportStatus === "unsupported") {
     return (
       <main className="app">
         <h1>デバイスにアクセスできません</h1>
-        <p>このマシンはメディアデバイス API をサポートしていません。</p>
+        <p>{mediaSupportMessage}</p>
       </main>
     );
   }
@@ -616,6 +819,10 @@ function App() {
         <h1>Vlog Recorder</h1>
         <p>選択した対象（画面・カメラ・音声）を同時に録画 / 録音できます。</p>
       </header>
+
+      {mediaSupportMessage && (
+        <p className="auto-stop-message">{mediaSupportMessage}</p>
+      )}
 
       <section className="control-panel">
         <div className="toggles">

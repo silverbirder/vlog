@@ -8,6 +8,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder
         ::default()
+        .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
