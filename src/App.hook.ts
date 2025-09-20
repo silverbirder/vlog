@@ -14,17 +14,6 @@ type TauriNotificationModule = typeof import("@tauri-apps/plugin-notification");
 type TauriMacosPermissionsModule =
   typeof import("tauri-plugin-macos-permissions-api");
 
-function isTauriEnvironment() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  const globalWindow = window as unknown as {
-    __TAURI__?: unknown;
-    __TAURI_INTERNALS__?: unknown;
-  };
-  return Boolean(globalWindow.__TAURI__ || globalWindow.__TAURI_INTERNALS__);
-}
-
 export const useApp = () => {
   const [enabledSources, setEnabledSources] = useState({
     screen: true,
@@ -46,16 +35,13 @@ export const useApp = () => {
   const [mediaSupportMessage, setMediaSupportMessage] = useState(
     globalThis.navigator?.mediaDevices
       ? ""
-      : "このマシンはメディアデバイス API をサポートしていません。",
+      : "このマシンはメディアデバイス API をサポートしていません。"
   );
   const autoStopMinutesId = useId();
   const autoStopSecondsId = useId();
 
   const loadTauriNotification =
     useCallback(async (): Promise<TauriNotificationModule | null> => {
-      if (!isTauriEnvironment()) {
-        return null;
-      }
       try {
         const module = await import("@tauri-apps/plugin-notification");
         return module;
@@ -67,9 +53,6 @@ export const useApp = () => {
 
   const loadTauriMacosPermissions =
     useCallback(async (): Promise<TauriMacosPermissionsModule | null> => {
-      if (!isTauriEnvironment()) {
-        return null;
-      }
       try {
         const module = await import("tauri-plugin-macos-permissions-api");
         return module;
@@ -88,7 +71,7 @@ export const useApp = () => {
 
     const evaluateSupport = async () => {
       const navigatorAvailableInitially = Boolean(
-        globalThis.navigator?.mediaDevices,
+        globalThis.navigator?.mediaDevices
       );
 
       if (navigatorAvailableInitially) {
@@ -99,22 +82,12 @@ export const useApp = () => {
         return;
       }
 
-      if (!isTauriEnvironment()) {
-        if (!disposed) {
-          setMediaSupportStatus("unsupported");
-          setMediaSupportMessage(
-            "このマシンはメディアデバイス API をサポートしていません。",
-          );
-        }
-        return;
-      }
-
       const permissions = await loadTauriMacosPermissions();
       if (!permissions) {
         if (!disposed) {
           setMediaSupportStatus("unsupported");
           setMediaSupportMessage(
-            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。",
+            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。"
           );
         }
         return;
@@ -139,7 +112,7 @@ export const useApp = () => {
 
       const ensurePermission = async (
         check?: () => Promise<unknown>,
-        request?: () => Promise<unknown>,
+        request?: () => Promise<unknown>
       ): Promise<boolean> => {
         try {
           if (check) {
@@ -178,7 +151,7 @@ export const useApp = () => {
               : undefined,
             permissions.requestMicrophonePermission
               ? () => permissions.requestMicrophonePermission()
-              : undefined,
+              : undefined
           ),
           ensurePermission(
             permissions.checkCameraPermission
@@ -186,18 +159,18 @@ export const useApp = () => {
               : undefined,
             permissions.requestCameraPermission
               ? () => permissions.requestCameraPermission()
-              : undefined,
+              : undefined
           ),
           ensurePermission(
             checkScreenPermission ? () => checkScreenPermission() : undefined,
             requestScreenPermission
               ? () => requestScreenPermission()
-              : undefined,
+              : undefined
           ),
         ]);
 
       const navigatorAvailableAfter = Boolean(
-        globalThis.navigator?.mediaDevices,
+        globalThis.navigator?.mediaDevices
       );
 
       if (disposed) {
@@ -215,8 +188,8 @@ export const useApp = () => {
           if (denied.length > 0) {
             setMediaSupportMessage(
               `${denied.join(
-                "・",
-              )}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`,
+                "・"
+              )}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`
             );
           } else {
             setMediaSupportMessage("");
@@ -230,14 +203,14 @@ export const useApp = () => {
       if (microphoneGranted || cameraGranted || screenGranted) {
         setMediaSupportStatus("supported");
         setMediaSupportMessage(
-          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。",
+          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。"
         );
         return;
       }
 
       setMediaSupportStatus("unsupported");
       setMediaSupportMessage(
-        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。",
+        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。"
       );
     };
 
@@ -346,7 +319,7 @@ export const useApp = () => {
 
       showFallbackAlert();
     },
-    [loadTauriNotification],
+    [loadTauriNotification]
   );
 
   const ensureNotificationPermission = useCallback(async () => {
@@ -385,7 +358,7 @@ export const useApp = () => {
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       throw new Error(
-        "このプラットフォームでは画面録画がサポートされていません。",
+        "このプラットフォームでは画面録画がサポートされていません。"
       );
     }
 
@@ -458,21 +431,21 @@ export const useApp = () => {
         defaultDownloadName: "audio-recording",
       },
     ],
-    [audioRecorder, cameraRecorder, screenRecorder],
+    [audioRecorder, cameraRecorder, screenRecorder]
   );
 
   const isAnyRecording = controllerEntries.some(
-    ({ controller }) => controller.isRecording,
+    ({ controller }) => controller.isRecording
   );
   const isAnyEnabled = Object.values(enabledSources).some(Boolean);
   const canResetAll = controllerEntries.some(
     ({ controller }) =>
       controller.mediaUrl !== null ||
       controller.status === "error" ||
-      controller.status === "stopped",
+      controller.status === "stopped"
   );
   const hasDownloads = controllerEntries.some(
-    ({ controller }) => controller.mediaUrl,
+    ({ controller }) => controller.mediaUrl
   );
 
   const scheduledAutoStopSeconds =
@@ -507,9 +480,9 @@ export const useApp = () => {
         const label = formatDuration(secondsForNotification);
         const baseMessage = `指定した${label}が経過したため、自動的に停止しました。`;
 
-        if (tauriNotificationPermission === "denied" && isTauriEnvironment()) {
+        if (tauriNotificationPermission === "denied") {
           setAutoStopMessage(
-            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`,
+            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`
           );
         } else if (
           typeof window !== "undefined" &&
@@ -517,7 +490,7 @@ export const useApp = () => {
           Notification.permission === "denied"
         ) {
           setAutoStopMessage(
-            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`,
+            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`
           );
         } else {
           setAutoStopMessage(baseMessage);
@@ -533,7 +506,7 @@ export const useApp = () => {
       controllerEntries,
       tauriNotificationPermission,
       notifyAutoStop,
-    ],
+    ]
   );
 
   const startAll = useCallback(async () => {
@@ -548,7 +521,7 @@ export const useApp = () => {
     const notificationPermissionPromise = ensureNotificationPermission().catch(
       (err) => {
         console.warn("Notification permission check failed", err);
-      },
+      }
     );
 
     try {
