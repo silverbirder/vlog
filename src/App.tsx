@@ -1,8 +1,15 @@
 import type { ChangeEvent } from "react";
-import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  type MediaRecorderController,
   useMediaRecorder,
-  MediaRecorderController,
 } from "./hooks/useMediaRecorder";
 import "./App.css";
 
@@ -20,9 +27,10 @@ type RecorderCardProps = {
 };
 
 type TauriNotificationModule = typeof import("@tauri-apps/plugin-notification");
-type TauriMacosPermissionsModule = typeof import(
-  "tauri-plugin-macos-permissions-api"
-);
+type TauriMacosPermissionsModule =
+  typeof import("tauri-plugin-macos-permissions-api");
+
+const FALLBACK_CAPTIONS_SRC = "data:text/vtt,WEBVTT";
 
 function isTauriEnvironment() {
   if (typeof window === "undefined") {
@@ -190,16 +198,28 @@ function RecorderCard({
 
       {mediaUrl &&
         (mediaKind === "audio" ? (
-          <audio className="playback" controls src={mediaUrl} />
+          <audio className="playback" controls src={mediaUrl}>
+            <track
+              kind="captions"
+              src={FALLBACK_CAPTIONS_SRC}
+              label="空のキャプション"
+            />
+          </audio>
         ) : (
-          <video className="playback" controls src={mediaUrl} />
+          <video className="playback" controls src={mediaUrl}>
+            <track
+              kind="captions"
+              src={FALLBACK_CAPTIONS_SRC}
+              label="空のキャプション"
+            />
+          </video>
         ))}
 
       <div className="card-actions">
-        <button onClick={handleDownload} disabled={!mediaUrl}>
+        <button type="button" onClick={handleDownload} disabled={!mediaUrl}>
           保存
         </button>
-        <button onClick={handleReset} disabled={!canReset}>
+        <button type="button" onClick={handleReset} disabled={!canReset}>
           個別リセット
         </button>
       </div>
@@ -226,16 +246,14 @@ function App() {
     useState<"unknown" | "granted" | "denied">("unknown");
   const [mediaSupportStatus, setMediaSupportStatus] = useState<
     "pending" | "supported" | "unsupported"
-  >(
-    typeof navigator !== "undefined" && navigator.mediaDevices
-      ? "supported"
-      : "pending"
-  );
+  >(globalThis.navigator?.mediaDevices ? "supported" : "pending");
   const [mediaSupportMessage, setMediaSupportMessage] = useState(
-    typeof navigator !== "undefined" && navigator.mediaDevices
+    globalThis.navigator?.mediaDevices
       ? ""
-      : "このマシンはメディアデバイス API をサポートしていません。"
+      : "このマシンはメディアデバイス API をサポートしていません。",
   );
+  const autoStopMinutesId = useId();
+  const autoStopSecondsId = useId();
 
   const loadTauriNotification =
     useCallback(async (): Promise<TauriNotificationModule | null> => {
@@ -273,8 +291,9 @@ function App() {
     let disposed = false;
 
     const evaluateSupport = async () => {
-      const navigatorAvailableInitially =
-        typeof navigator !== "undefined" && navigator.mediaDevices;
+      const navigatorAvailableInitially = Boolean(
+        globalThis.navigator?.mediaDevices,
+      );
 
       if (navigatorAvailableInitially) {
         if (!disposed) {
@@ -288,7 +307,7 @@ function App() {
         if (!disposed) {
           setMediaSupportStatus("unsupported");
           setMediaSupportMessage(
-            "このマシンはメディアデバイス API をサポートしていません。"
+            "このマシンはメディアデバイス API をサポートしていません。",
           );
         }
         return;
@@ -299,7 +318,7 @@ function App() {
         if (!disposed) {
           setMediaSupportStatus("unsupported");
           setMediaSupportMessage(
-            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。"
+            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。",
           );
         }
         return;
@@ -324,7 +343,7 @@ function App() {
 
       const ensurePermission = async (
         check?: () => Promise<unknown>,
-        request?: () => Promise<unknown>
+        request?: () => Promise<unknown>,
       ): Promise<boolean> => {
         try {
           if (check) {
@@ -344,14 +363,16 @@ function App() {
 
       const checkScreenPermission =
         permissions.checkScreenRecordingPermission ??
-        ((permissions as Record<string, unknown>)[
-          "checkScreenCapturePermission"
-        ] as (() => Promise<boolean>) | undefined);
+        ((permissions as Record<string, unknown>)
+          .checkScreenCapturePermission as
+          | (() => Promise<boolean>)
+          | undefined);
       const requestScreenPermission =
         permissions.requestScreenRecordingPermission ??
-        ((permissions as Record<string, unknown>)[
-          "requestScreenCapturePermission"
-        ] as (() => Promise<boolean>) | undefined);
+        ((permissions as Record<string, unknown>)
+          .requestScreenCapturePermission as
+          | (() => Promise<boolean>)
+          | undefined);
 
       const [microphoneGranted, cameraGranted, screenGranted] =
         await Promise.all([
@@ -361,7 +382,7 @@ function App() {
               : undefined,
             permissions.requestMicrophonePermission
               ? () => permissions.requestMicrophonePermission()
-              : undefined
+              : undefined,
           ),
           ensurePermission(
             permissions.checkCameraPermission
@@ -369,18 +390,19 @@ function App() {
               : undefined,
             permissions.requestCameraPermission
               ? () => permissions.requestCameraPermission()
-              : undefined
+              : undefined,
           ),
           ensurePermission(
             checkScreenPermission ? () => checkScreenPermission() : undefined,
             requestScreenPermission
               ? () => requestScreenPermission()
-              : undefined
+              : undefined,
           ),
         ]);
 
-      const navigatorAvailableAfter =
-        typeof navigator !== "undefined" && navigator.mediaDevices;
+      const navigatorAvailableAfter = Boolean(
+        globalThis.navigator?.mediaDevices,
+      );
 
       if (disposed) {
         return;
@@ -396,7 +418,9 @@ function App() {
           ].filter(Boolean);
           if (denied.length > 0) {
             setMediaSupportMessage(
-              `${denied.join("・")}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`
+              `${denied.join(
+                "・",
+              )}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`,
             );
           } else {
             setMediaSupportMessage("");
@@ -410,14 +434,14 @@ function App() {
       if (microphoneGranted || cameraGranted || screenGranted) {
         setMediaSupportStatus("supported");
         setMediaSupportMessage(
-          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。"
+          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。",
         );
         return;
       }
 
       setMediaSupportStatus("unsupported");
       setMediaSupportMessage(
-        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。"
+        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。",
       );
     };
 
@@ -526,7 +550,7 @@ function App() {
 
       showFallbackAlert();
     },
-    [loadTauriNotification, setTauriNotificationPermission]
+    [loadTauriNotification],
   );
 
   const ensureNotificationPermission = useCallback(async () => {
@@ -565,7 +589,7 @@ function App() {
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       throw new Error(
-        "このプラットフォームでは画面録画がサポートされていません。"
+        "このプラットフォームでは画面録画がサポートされていません。",
       );
     }
 
@@ -582,9 +606,9 @@ function App() {
         const micStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
-        micStream
-          .getAudioTracks()
-          .forEach((track) => screenStream.addTrack(track));
+        micStream.getAudioTracks().forEach((track) => {
+          screenStream.addTrack(track);
+        });
       } catch (err) {
         console.warn("マイクの追加に失敗しました", err);
       }
@@ -638,21 +662,21 @@ function App() {
         defaultDownloadName: "audio-recording",
       },
     ],
-    [audioRecorder, cameraRecorder, screenRecorder]
+    [audioRecorder, cameraRecorder, screenRecorder],
   );
 
   const isAnyRecording = controllerEntries.some(
-    ({ controller }) => controller.isRecording
+    ({ controller }) => controller.isRecording,
   );
   const isAnyEnabled = Object.values(enabledSources).some(Boolean);
   const canResetAll = controllerEntries.some(
     ({ controller }) =>
       controller.mediaUrl !== null ||
       controller.status === "error" ||
-      controller.status === "stopped"
+      controller.status === "stopped",
   );
   const hasDownloads = controllerEntries.some(
-    ({ controller }) => controller.mediaUrl
+    ({ controller }) => controller.mediaUrl,
   );
 
   const scheduledAutoStopSeconds =
@@ -689,7 +713,7 @@ function App() {
 
         if (tauriNotificationPermission === "denied" && isTauriEnvironment()) {
           setAutoStopMessage(
-            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`
+            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`,
           );
         } else if (
           typeof window !== "undefined" &&
@@ -697,7 +721,7 @@ function App() {
           Notification.permission === "denied"
         ) {
           setAutoStopMessage(
-            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`
+            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`,
           );
         } else {
           setAutoStopMessage(baseMessage);
@@ -709,12 +733,11 @@ function App() {
       }
     },
     [
-      autoStopDurationSecondsRef,
       clearAutoStopTimer,
       controllerEntries,
       tauriNotificationPermission,
       notifyAutoStop,
-    ]
+    ],
   );
 
   const startAll = useCallback(async () => {
@@ -729,7 +752,7 @@ function App() {
     const notificationPermissionPromise = ensureNotificationPermission().catch(
       (err) => {
         console.warn("Notification permission check failed", err);
-      }
+      },
     );
 
     try {
@@ -770,7 +793,6 @@ function App() {
   }, [
     autoStopDurationMs,
     autoStopDurationSeconds,
-    autoStopDurationSecondsRef,
     clearAutoStopTimer,
     controllerEntries,
     enabledSources,
@@ -784,7 +806,9 @@ function App() {
   const resetAll = useCallback(() => {
     clearAutoStopTimer();
     setAutoStopMessage(null);
-    controllerEntries.forEach(({ controller }) => controller.reset());
+    controllerEntries.forEach(({ controller }) => {
+      controller.reset();
+    });
   }, [clearAutoStopTimer, controllerEntries]);
 
   const downloadAll = useCallback(() => {
@@ -871,10 +895,10 @@ function App() {
         </div>
 
         <div className="auto-stop-controls">
-          <label htmlFor="auto-stop-minutes">
+          <label htmlFor={autoStopMinutesId}>
             <span>自動停止タイマー（分）</span>
             <input
-              id="auto-stop-minutes"
+              id={autoStopMinutesId}
               type="number"
               min={0}
               step={1}
@@ -895,10 +919,10 @@ function App() {
               disabled={isStartingAll}
             />
           </label>
-          <label htmlFor="auto-stop-seconds">
+          <label htmlFor={autoStopSecondsId}>
             <span>秒</span>
             <input
-              id="auto-stop-seconds"
+              id={autoStopSecondsId}
               type="number"
               min={0}
               max={59}
@@ -938,6 +962,7 @@ function App() {
 
         <div className="global-controls">
           <button
+            type="button"
             onClick={startAll}
             disabled={!isAnyEnabled || isAnyRecording || isStartingAll}
             className="primary"
@@ -945,16 +970,21 @@ function App() {
             まとめて開始
           </button>
           <button
+            type="button"
             onClick={() => stopAll()}
             disabled={!isAnyRecording}
             className="warning"
           >
             停止
           </button>
-          <button onClick={resetAll} disabled={isAnyRecording || !canResetAll}>
+          <button
+            type="button"
+            onClick={resetAll}
+            disabled={isAnyRecording || !canResetAll}
+          >
             全リセット
           </button>
-          <button onClick={downloadAll} disabled={!hasDownloads}>
+          <button type="button" onClick={downloadAll} disabled={!hasDownloads}>
             全て保存
           </button>
         </div>

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build --no-bundle && tauri bundle --bundles app,dmg"
+    "tauri:build": "tauri build --no-bundle && tauri bundle --bundles app,dmg",
+    "check": "biome check --write src/"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -20,6 +21,7 @@
     "tauri-plugin-macos-permissions-api": "^2.3.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.2.4",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

@@ -54,7 +54,7 @@ function pickSupportedMime(kind: MimeKind): string | null {
 
 export function useMediaRecorder(
   getStream: GetStream,
-  kind: MimeKind
+  kind: MimeKind,
 ): MediaRecorderController {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -75,9 +75,11 @@ export function useMediaRecorder(
   useEffect(
     () => () => {
       revokeUrl();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((track) => {
+        track.stop();
+      });
     },
-    [revokeUrl]
+    [revokeUrl],
   );
 
   const start = useCallback(async () => {
@@ -100,7 +102,8 @@ export function useMediaRecorder(
       }
 
       const recorder = new MediaRecorder(streamResult, options);
-      mimeRef.current = recorder.mimeType || options.mimeType || mimeRef.current;
+      mimeRef.current =
+        recorder.mimeType || options.mimeType || mimeRef.current;
       chunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
@@ -140,7 +143,9 @@ export function useMediaRecorder(
         setStatus((prev) => (prev === "error" ? prev : "stopped"));
         setStream(null);
 
-        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current?.getTracks().forEach((track) => {
+          track.stop();
+        });
         streamRef.current = null;
       };
 
@@ -152,7 +157,7 @@ export function useMediaRecorder(
       setError(message);
       setStatus("error");
     }
-  }, [getStream, revokeUrl, status]);
+  }, [getStream, kind, revokeUrl, status]);
 
   const stop = useCallback(() => {
     if (recorderRef.current && status === "recording") {
@@ -170,7 +175,7 @@ export function useMediaRecorder(
 
   const download = useCallback(
     (
-      defaultName = kind === "audio" ? "audio-recording" : "video-recording"
+      defaultName = kind === "audio" ? "audio-recording" : "video-recording",
     ) => {
       if (!mediaUrl) {
         return;
@@ -179,11 +184,11 @@ export function useMediaRecorder(
       a.href = mediaUrl;
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(
-        now.getMonth() + 1
+        now.getMonth() + 1,
       ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
-        now.getHours()
+        now.getHours(),
       ).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(
-        now.getSeconds()
+        now.getSeconds(),
       ).padStart(2, "0")}`;
       const resolvedMime =
         mimeRef.current ??
@@ -212,7 +217,7 @@ export function useMediaRecorder(
       a.click();
       document.body.removeChild(a);
     },
-    [kind, mediaUrl]
+    [kind, mediaUrl],
   );
 
   return {
