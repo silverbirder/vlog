@@ -35,7 +35,7 @@ export const useApp = () => {
   const [mediaSupportMessage, setMediaSupportMessage] = useState(
     globalThis.navigator?.mediaDevices
       ? ""
-      : "このマシンはメディアデバイス API をサポートしていません。"
+      : "このマシンはメディアデバイス API をサポートしていません。",
   );
   const autoStopMinutesId = useId();
   const autoStopSecondsId = useId();
@@ -71,7 +71,7 @@ export const useApp = () => {
 
     const evaluateSupport = async () => {
       const navigatorAvailableInitially = Boolean(
-        globalThis.navigator?.mediaDevices
+        globalThis.navigator?.mediaDevices,
       );
 
       if (navigatorAvailableInitially) {
@@ -87,7 +87,7 @@ export const useApp = () => {
         if (!disposed) {
           setMediaSupportStatus("unsupported");
           setMediaSupportMessage(
-            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。"
+            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。",
           );
         }
         return;
@@ -112,7 +112,7 @@ export const useApp = () => {
 
       const ensurePermission = async (
         check?: () => Promise<unknown>,
-        request?: () => Promise<unknown>
+        request?: () => Promise<unknown>,
       ): Promise<boolean> => {
         try {
           if (check) {
@@ -151,7 +151,7 @@ export const useApp = () => {
               : undefined,
             permissions.requestMicrophonePermission
               ? () => permissions.requestMicrophonePermission()
-              : undefined
+              : undefined,
           ),
           ensurePermission(
             permissions.checkCameraPermission
@@ -159,18 +159,18 @@ export const useApp = () => {
               : undefined,
             permissions.requestCameraPermission
               ? () => permissions.requestCameraPermission()
-              : undefined
+              : undefined,
           ),
           ensurePermission(
             checkScreenPermission ? () => checkScreenPermission() : undefined,
             requestScreenPermission
               ? () => requestScreenPermission()
-              : undefined
+              : undefined,
           ),
         ]);
 
       const navigatorAvailableAfter = Boolean(
-        globalThis.navigator?.mediaDevices
+        globalThis.navigator?.mediaDevices,
       );
 
       if (disposed) {
@@ -188,8 +188,8 @@ export const useApp = () => {
           if (denied.length > 0) {
             setMediaSupportMessage(
               `${denied.join(
-                "・"
-              )}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`
+                "・",
+              )}の権限が拒否されているため、一部の録画機能を利用できません。システム設定 > プライバシーとセキュリティ から許可してください。`,
             );
           } else {
             setMediaSupportMessage("");
@@ -203,14 +203,14 @@ export const useApp = () => {
       if (microphoneGranted || cameraGranted || screenGranted) {
         setMediaSupportStatus("supported");
         setMediaSupportMessage(
-          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。"
+          "権限は付与されていますが、ブラウザのメディア API が利用できません。アプリや OS を再起動して再度お試しください。",
         );
         return;
       }
 
       setMediaSupportStatus("unsupported");
       setMediaSupportMessage(
-        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。"
+        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。",
       );
     };
 
@@ -258,9 +258,7 @@ export const useApp = () => {
   const clearAutoStopTimer = useCallback(() => {
     if (autoStopTimerRef.current !== null) {
       const timeoutId = autoStopTimerRef.current;
-      if (typeof window !== "undefined") {
-        window.clearTimeout(timeoutId);
-      }
+      window.clearTimeout(timeoutId);
       autoStopTimerRef.current = null;
     }
     autoStopDurationSecondsRef.current = null;
@@ -272,15 +270,6 @@ export const useApp = () => {
       const label = formatDuration(durationSeconds);
       const title = "録画を停止しました";
       const body = `指定した${label}が経過したため、自動停止しました。`;
-
-      const showFallbackAlert = () => {
-        if (
-          typeof window !== "undefined" &&
-          typeof window.alert === "function"
-        ) {
-          window.alert(body);
-        }
-      };
 
       const tauriNotification = await loadTauriNotification();
       if (tauriNotification) {
@@ -295,31 +284,8 @@ export const useApp = () => {
           console.warn("Failed to send Tauri notification", err);
         }
       }
-
-      if (typeof window === "undefined" || !("Notification" in window)) {
-        showFallbackAlert();
-        return;
-      }
-
-      if (Notification.permission === "granted") {
-        new Notification(title, { body });
-        return;
-      }
-
-      if (Notification.permission !== "denied") {
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            new Notification(title, { body });
-          } else {
-            showFallbackAlert();
-          }
-        });
-        return;
-      }
-
-      showFallbackAlert();
     },
-    [loadTauriNotification]
+    [loadTauriNotification],
   );
 
   const ensureNotificationPermission = useCallback(async () => {
@@ -341,24 +307,12 @@ export const useApp = () => {
         console.warn("Failed to request Tauri notification permission", err);
       }
     }
-
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      return;
-    }
-
-    if (Notification.permission === "default") {
-      try {
-        await Notification.requestPermission();
-      } catch (err) {
-        console.warn("Failed to request browser notification permission", err);
-      }
-    }
   }, [loadTauriNotification]);
 
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       throw new Error(
-        "このプラットフォームでは画面録画がサポートされていません。"
+        "このプラットフォームでは画面録画がサポートされていません。",
       );
     }
 
@@ -431,21 +385,21 @@ export const useApp = () => {
         defaultDownloadName: "audio-recording",
       },
     ],
-    [audioRecorder, cameraRecorder, screenRecorder]
+    [audioRecorder, cameraRecorder, screenRecorder],
   );
 
   const isAnyRecording = controllerEntries.some(
-    ({ controller }) => controller.isRecording
+    ({ controller }) => controller.isRecording,
   );
   const isAnyEnabled = Object.values(enabledSources).some(Boolean);
   const canResetAll = controllerEntries.some(
     ({ controller }) =>
       controller.mediaUrl !== null ||
       controller.status === "error" ||
-      controller.status === "stopped"
+      controller.status === "stopped",
   );
   const hasDownloads = controllerEntries.some(
-    ({ controller }) => controller.mediaUrl
+    ({ controller }) => controller.mediaUrl,
   );
 
   const scheduledAutoStopSeconds =
@@ -482,15 +436,7 @@ export const useApp = () => {
 
         if (tauriNotificationPermission === "denied") {
           setAutoStopMessage(
-            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`
-          );
-        } else if (
-          typeof window !== "undefined" &&
-          "Notification" in window &&
-          Notification.permission === "denied"
-        ) {
-          setAutoStopMessage(
-            `${baseMessage} ブラウザの通知がブロックされています。通知を受け取りたい場合はブラウザ設定で許可してください。`
+            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`,
           );
         } else {
           setAutoStopMessage(baseMessage);
@@ -506,7 +452,7 @@ export const useApp = () => {
       controllerEntries,
       tauriNotificationPermission,
       notifyAutoStop,
-    ]
+    ],
   );
 
   const startAll = useCallback(async () => {
@@ -521,7 +467,7 @@ export const useApp = () => {
     const notificationPermissionPromise = ensureNotificationPermission().catch(
       (err) => {
         console.warn("Notification permission check failed", err);
-      }
+      },
     );
 
     try {
@@ -541,12 +487,7 @@ export const useApp = () => {
         }
       }
 
-      if (
-        didStartAny &&
-        autoStopDurationMs &&
-        autoStopDurationSeconds &&
-        typeof window !== "undefined"
-      ) {
+      if (didStartAny && autoStopDurationMs && autoStopDurationSeconds) {
         autoStopDurationSecondsRef.current = autoStopDurationSeconds;
         const timeoutId = window.setTimeout(() => {
           stopAll({ auto: true, durationSeconds: autoStopDurationSeconds });
