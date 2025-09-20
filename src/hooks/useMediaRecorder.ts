@@ -20,19 +20,19 @@ export interface MediaRecorderController {
 }
 
 const VIDEO_MIME_CANDIDATES = [
+  "video/mp4;codecs=h264,aac",
+  "video/mp4",
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
   "video/webm",
-  "video/mp4",
-  "video/mp4;codecs=h264,aac",
 ];
 
 const AUDIO_MIME_CANDIDATES = [
+  "audio/mpeg",
+  "audio/mp4;codecs=aac",
+  "audio/mp4",
   "audio/webm;codecs=opus",
   "audio/webm",
-  "audio/mp4",
-  "audio/mp4;codecs=aac",
-  "audio/mpeg",
 ];
 
 function pickSupportedMime(kind: MimeKind): string | null {
@@ -100,6 +100,7 @@ export function useMediaRecorder(
       }
 
       const recorder = new MediaRecorder(streamResult, options);
+      mimeRef.current = recorder.mimeType || options.mimeType || mimeRef.current;
       chunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
@@ -126,8 +127,13 @@ export function useMediaRecorder(
       });
 
       recorder.onstop = () => {
+        const resolvedMime =
+          recorder.mimeType ||
+          mimeRef.current ||
+          (kind === "audio" ? "audio/mpeg" : "video/mp4");
+        mimeRef.current = resolvedMime;
         const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || mimeRef.current || undefined,
+          type: resolvedMime,
         });
         const url = URL.createObjectURL(blob);
         setMediaUrl(url);
@@ -179,10 +185,28 @@ export function useMediaRecorder(
       ).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(
         now.getSeconds()
       ).padStart(2, "0")}`;
-      const extension =
-        (mimeRef.current ?? recorderRef.current?.mimeType ?? "video/webm")
-          .split("/")[1]
-          ?.split(";")[0] ?? (kind === "audio" ? "webm" : "webm");
+      const resolvedMime =
+        mimeRef.current ??
+        recorderRef.current?.mimeType ??
+        (kind === "audio" ? "audio/mpeg" : "video/mp4");
+
+      let extension = kind === "audio" ? "mp3" : "mp4";
+      const subtype = resolvedMime.split("/")[1]?.split(";")[0] ?? null;
+
+      if (kind === "video") {
+        if (!resolvedMime.includes("mp4")) {
+          extension = subtype ?? "webm";
+        }
+      } else {
+        if (resolvedMime.includes("mpeg")) {
+          extension = "mp3";
+        } else if (resolvedMime.includes("mp4")) {
+          extension = "m4a";
+        } else if (subtype) {
+          extension = subtype;
+        }
+      }
+
       a.download = `${defaultName}_${timestamp}.${extension}`;
       document.body.appendChild(a);
       a.click();
