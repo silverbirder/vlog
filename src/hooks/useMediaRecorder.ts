@@ -1,23 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MediaRecorderController } from "@/types";
 
 type RecorderStatus = "idle" | "recording" | "stopped" | "error";
 
 type MimeKind = "video" | "audio";
 
 type GetStream = () => Promise<MediaStream>;
-
-export interface MediaRecorderController {
-  status: RecorderStatus;
-  error: string | null;
-  mediaUrl: string | null;
-  mimeType: string | null;
-  isRecording: boolean;
-  start: () => Promise<void>;
-  stop: () => void;
-  reset: () => void;
-  download: (defaultName?: string) => void;
-  stream: MediaStream | null;
-}
 
 const VIDEO_MIME_CANDIDATES = [
   "video/mp4;codecs=h264,aac",
