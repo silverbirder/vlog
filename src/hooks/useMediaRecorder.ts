@@ -209,15 +209,15 @@ export function useMediaRecorder(
   );
 
   return {
-    status,
+    download,
     error,
+    isRecording: status === "recording",
     mediaUrl,
     mimeType: mimeRef.current,
-    isRecording: status === "recording",
-    start,
-    stop,
     reset,
-    download,
+    start,
+    status,
+    stop,
     stream,
   };
 }

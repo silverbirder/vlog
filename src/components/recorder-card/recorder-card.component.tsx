@@ -42,8 +42,8 @@ export const RecorderCard = ({
         </div>
         <label className={`feature-toggle${enabled ? " active" : ""}`}>
           <input
-            type="checkbox"
             checked={enabled}
+            disabled={toggleDisabled}
             onChange={(event) => {
               const checked =
                 (event.target instanceof HTMLInputElement &&
@@ -51,7 +51,7 @@ export const RecorderCard = ({
                 false;
               onToggle(checked);
             }}
-            disabled={toggleDisabled}
+            type="checkbox"
           />
           <span>{enabled ? "使用中" : "無効"}</span>
         </label>
@@ -70,7 +70,7 @@ export const RecorderCard = ({
       )}
 
       {enabled && stream && mediaKind === "video" && (
-        <VideoStream stream={stream} mirrored={previewMirror} />
+        <VideoStream mirrored={previewMirror} stream={stream} />
       )}
 
       {mediaUrl &&
@@ -78,25 +78,25 @@ export const RecorderCard = ({
           <audio className="playback" controls src={mediaUrl}>
             <track
               kind="captions"
-              src={FALLBACK_CAPTIONS_SRC}
               label="空のキャプション"
+              src={FALLBACK_CAPTIONS_SRC}
             />
           </audio>
         ) : (
           <video className="playback" controls src={mediaUrl}>
             <track
               kind="captions"
-              src={FALLBACK_CAPTIONS_SRC}
               label="空のキャプション"
+              src={FALLBACK_CAPTIONS_SRC}
             />
           </video>
         ))}
 
       <div className="card-actions">
-        <button type="button" onClick={handleDownload} disabled={!mediaUrl}>
+        <button disabled={!mediaUrl} onClick={handleDownload} type="button">
           保存
         </button>
-        <button type="button" onClick={handleReset} disabled={!canReset}>
+        <button disabled={!canReset} onClick={handleReset} type="button">
           個別リセット
         </button>
       </div>

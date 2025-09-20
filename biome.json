@@ -27,7 +27,9 @@
 		"enabled": true,
 		"actions": {
 			"source": {
-				"organizeImports": "on"
+				"organizeImports": "on",
+				"useSortedKeys": "on",
+				"useSortedAttributes": "on"
 			}
 		}
 	}

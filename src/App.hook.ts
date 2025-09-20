@@ -16,9 +16,9 @@ type TauriMacosPermissionsModule =
 
 export const useApp = () => {
   const [enabledSources, setEnabledSources] = useState({
-    screen: true,
-    camera: true,
     audio: false,
+    camera: true,
+    screen: true,
   });
   const [isStartingAll, setIsStartingAll] = useState(false);
   const [autoStopMinutesInput, setAutoStopMinutesInput] = useState("15");
@@ -276,7 +276,7 @@ export const useApp = () => {
         try {
           const granted = await tauriNotification.isPermissionGranted();
           if (granted) {
-            await tauriNotification.sendNotification({ title, body });
+            await tauriNotification.sendNotification({ body, title });
             return;
           }
           setTauriNotificationPermission("denied");
@@ -317,8 +317,8 @@ export const useApp = () => {
     }
 
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: "monitor" },
       audio: true,
+      video: { displaySurface: "monitor" },
     });
 
     if (
@@ -346,8 +346,8 @@ export const useApp = () => {
     }
 
     return navigator.mediaDevices.getUserMedia({
-      video: { width: 1280, height: 720 },
       audio: true,
+      video: { height: 720, width: 1280 },
     });
   }, []);
 
@@ -370,19 +370,19 @@ export const useApp = () => {
   }> = useMemo(
     () => [
       {
-        key: "screen",
         controller: screenRecorder,
         defaultDownloadName: "screen-recording",
+        key: "screen",
       },
       {
-        key: "camera",
         controller: cameraRecorder,
         defaultDownloadName: "camera-recording",
+        key: "camera",
       },
       {
-        key: "audio",
         controller: audioRecorder,
         defaultDownloadName: "audio-recording",
+        key: "audio",
       },
     ],
     [audioRecorder, cameraRecorder, screenRecorder],
@@ -530,30 +530,32 @@ export const useApp = () => {
   }, [controllerEntries]);
 
   return {
-    screenRecorder,
-    cameraRecorder,
     audioRecorder,
-    enabledSources,
-    setEnabledSources,
-    isStartingAll,
-    autoStopMinutesInput,
-    setAutoStopMinutesInput,
-    autoStopSecondsInput,
-    setAutoStopSecondsInput,
     autoStopDeadline,
     autoStopMessage,
-    mediaSupportStatus,
-    mediaSupportMessage,
-    isAnyRecording,
-    isAnyEnabled,
+    autoStopMinutesId,
+    autoStopMinutesInput,
+    autoStopSecondsId,
+    autoStopSecondsInput,
+    cameraRecorder,
     canResetAll,
+    downloadAll,
+    enabledSources,
     hasDownloads,
+    isAnyEnabled,
+    isAnyRecording,
+    isStartingAll,
+    mediaSupportMessage,
+    mediaSupportStatus,
+    resetAll,
+    scheduledAutoStopSeconds,
+    screenRecorder,
+    setAutoStopMinutesInput,
+    setAutoStopSecondsInput,
+    setEnabledSources,
     startAll,
     stopAll,
-    resetAll,
-    downloadAll,
-    autoStopMinutesId,
-    autoStopSecondsId,
-    scheduledAutoStopSeconds,
   } as const;
 };
+
+export type UseAppReturn = ReturnType<typeof useApp>;

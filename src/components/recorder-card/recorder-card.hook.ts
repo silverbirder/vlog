@@ -45,9 +45,9 @@ export const useRecorderCard = ({ controller, onDownload, onReset }: Props) => {
     (mediaUrl !== null || status === "error" || status === "stopped");
 
   return {
-    statusLabel,
+    canReset,
     handleDownload,
     handleReset,
-    canReset,
+    statusLabel,
   } as const;
 };
