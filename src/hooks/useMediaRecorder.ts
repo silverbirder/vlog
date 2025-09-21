@@ -1,3 +1,5 @@
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaRecorderController } from "@/types";
 
@@ -168,8 +170,7 @@ export function useMediaRecorder(
       if (!mediaUrl) {
         return;
       }
-      const a = document.createElement("a");
-      a.href = mediaUrl;
+
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(
         now.getMonth() + 1,
@@ -200,10 +201,26 @@ export function useMediaRecorder(
         }
       }
 
-      a.download = `${defaultName}_${timestamp}.${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      void (async () => {
+        try {
+          setError(null);
+          const response = await fetch(mediaUrl);
+          const blob = await response.blob();
+          const suggestedPath = await save({
+            defaultPath: `${defaultName}_${timestamp}.${extension}`,
+          });
+
+          if (!suggestedPath) {
+            return;
+          }
+
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          await writeFile(suggestedPath, bytes);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          setError(message);
+        }
+      })();
     },
     [kind, mediaUrl],
   );
