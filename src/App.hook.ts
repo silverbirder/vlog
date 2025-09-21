@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAutoStop } from "@/hooks/useAutoStop";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
 import {
@@ -20,20 +21,30 @@ export const useApp = () => {
     screen: true,
   });
   const [isStartingAll, setIsStartingAll] = useState(false);
-  const [autoStopMinutesInput, setAutoStopMinutesInput] = useState("15");
-  const [autoStopSecondsInput, setAutoStopSecondsInput] = useState("0");
-  const [scheduledAutoStopSecondsState, setScheduledAutoStopSecondsState] =
-    useState<number | null>(null);
-  const [autoStopDeadline, setAutoStopDeadline] = useState<Date | null>(null);
-  const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
   const [tauriNotificationPermission, setTauriNotificationPermission] =
     useState<"unknown" | "granted" | "denied">("unknown");
   const [mediaSupportStatus, setMediaSupportStatus] = useState<
     "pending" | "supported" | "unsupported"
   >("pending");
   const [mediaSupportMessage, setMediaSupportMessage] = useState("");
-  const autoStopMinutesId = useId();
-  const autoStopSecondsId = useId();
+
+  const {
+    autoStopDeadline,
+    autoStopDurationSeconds,
+    autoStopMessage,
+    autoStopMinutesId,
+    autoStopMinutesInput,
+    autoStopSecondsId,
+    autoStopSecondsInput,
+    clearAutoStop,
+    scheduleAutoStop,
+    scheduledAutoStopSeconds,
+    scheduledAutoStopSecondsState,
+    setAutoStopHandler,
+    setAutoStopMessage,
+    setAutoStopMinutesInput,
+    setAutoStopSecondsInput,
+  } = useAutoStop();
 
   useEffect(() => {
     if (mediaSupportStatus !== "pending") {
@@ -109,45 +120,6 @@ export const useApp = () => {
       disposed = true;
     };
   }, [mediaSupportStatus]);
-
-  const autoStopDurationSeconds = useMemo(() => {
-    const minutesRaw = Number(autoStopMinutesInput);
-    const secondsRaw = Number(autoStopSecondsInput);
-
-    if (
-      Number.isNaN(minutesRaw) ||
-      minutesRaw < 0 ||
-      !Number.isFinite(minutesRaw) ||
-      Number.isNaN(secondsRaw) ||
-      secondsRaw < 0 ||
-      !Number.isFinite(secondsRaw)
-    ) {
-      return null;
-    }
-
-    const minutes = Math.floor(minutesRaw);
-    const seconds = Math.floor(secondsRaw);
-
-    if (seconds >= 60) {
-      return minutes * 60 + 59;
-    }
-
-    const totalSeconds = minutes * 60 + seconds;
-
-    return totalSeconds > 0 ? totalSeconds : null;
-  }, [autoStopMinutesInput, autoStopSecondsInput]);
-
-  const autoStopDurationMs = useMemo(() => {
-    if (!autoStopDurationSeconds) {
-      return null;
-    }
-    return autoStopDurationSeconds * 1000;
-  }, [autoStopDurationSeconds]);
-
-  const clearAutoStopTimer = useCallback(() => {
-    setAutoStopDeadline(null);
-    setScheduledAutoStopSecondsState(null);
-  }, []);
 
   const notifyAutoStop = useCallback(async (durationSeconds: number) => {
     const label = formatDuration(durationSeconds);
@@ -253,27 +225,24 @@ export const useApp = () => {
     ({ controller }) => controller.mediaUrl,
   );
 
-  const scheduledAutoStopSeconds =
-    scheduledAutoStopSecondsState ?? autoStopDurationSeconds ?? null;
-
   useEffect(() => {
     if (!isAnyRecording) {
-      clearAutoStopTimer();
+      clearAutoStop();
     }
-  }, [clearAutoStopTimer, isAnyRecording]);
+  }, [clearAutoStop, isAnyRecording]);
 
   useEffect(() => {
     return () => {
-      clearAutoStopTimer();
+      clearAutoStop();
     };
-  }, [clearAutoStopTimer]);
+  }, [clearAutoStop]);
 
   const stopAll = useCallback(
     (options: StopAllOptions = {}) => {
       const secondsForNotification =
         options.durationSeconds ?? scheduledAutoStopSecondsState ?? null;
 
-      clearAutoStopTimer();
+      clearAutoStop();
 
       controllerEntries.forEach(({ controller }) => {
         if (controller.isRecording) {
@@ -299,48 +268,27 @@ export const useApp = () => {
       }
     },
     [
-      clearAutoStopTimer,
+      clearAutoStop,
       controllerEntries,
       scheduledAutoStopSecondsState,
       tauriNotificationPermission,
+      setAutoStopMessage,
       notifyAutoStop,
     ],
   );
 
   useEffect(() => {
-    if (!autoStopDeadline || scheduledAutoStopSecondsState === null) {
-      return;
-    }
-
-    const now = Date.now();
-    const remaining = autoStopDeadline.getTime() - now;
-
-    if (remaining <= 0) {
-      stopAll({
-        auto: true,
-        durationSeconds: scheduledAutoStopSecondsState,
-      });
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      stopAll({
-        auto: true,
-        durationSeconds: scheduledAutoStopSecondsState,
-      });
-    }, remaining);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [autoStopDeadline, scheduledAutoStopSecondsState, stopAll]);
+    setAutoStopHandler((durationSeconds) => {
+      stopAll({ auto: true, durationSeconds });
+    });
+  }, [setAutoStopHandler, stopAll]);
 
   const startAll = useCallback(async () => {
     if (isStartingAll || isAnyRecording || !isAnyEnabled) {
       return;
     }
 
-    clearAutoStopTimer();
+    clearAutoStop();
     setAutoStopMessage(null);
     setIsStartingAll(true);
 
@@ -367,9 +315,8 @@ export const useApp = () => {
         }
       }
 
-      if (didStartAny && autoStopDurationMs && autoStopDurationSeconds) {
-        setScheduledAutoStopSecondsState(autoStopDurationSeconds);
-        setAutoStopDeadline(new Date(Date.now() + autoStopDurationMs));
+      if (didStartAny && autoStopDurationSeconds) {
+        scheduleAutoStop(autoStopDurationSeconds);
       }
     } finally {
       setIsStartingAll(false);
@@ -377,24 +324,25 @@ export const useApp = () => {
 
     await notificationPermissionPromise;
   }, [
-    autoStopDurationMs,
     autoStopDurationSeconds,
-    clearAutoStopTimer,
+    clearAutoStop,
     controllerEntries,
     enabledSources,
     isAnyEnabled,
     isAnyRecording,
     isStartingAll,
     ensureNotificationPermission,
+    setAutoStopMessage,
+    scheduleAutoStop,
   ]);
 
   const resetAll = useCallback(() => {
-    clearAutoStopTimer();
+    clearAutoStop();
     setAutoStopMessage(null);
     controllerEntries.forEach(({ controller }) => {
       controller.reset();
     });
-  }, [clearAutoStopTimer, controllerEntries]);
+  }, [clearAutoStop, controllerEntries, setAutoStopMessage]);
 
   const downloadAll = useCallback(() => {
     controllerEntries.forEach(({ controller, defaultDownloadName }) => {
