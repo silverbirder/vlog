@@ -20,7 +20,7 @@ type StopAllOptions = {
 
 export const useApp = () => {
   const [enabledSources, setEnabledSources] = useState({
-    audio: false,
+    audio: true,
     camera: true,
     screen: true,
   });
