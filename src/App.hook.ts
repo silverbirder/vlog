@@ -11,12 +11,17 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  checkCameraPermission,
+  checkMicrophonePermission,
+  checkScreenRecordingPermission,
+  requestCameraPermission,
+  requestMicrophonePermission,
+  requestScreenRecordingPermission,
+} from "tauri-plugin-macos-permissions-api";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
 import { formatDuration } from "@/utils";
-
-type TauriMacosPermissionsModule =
-  typeof import("tauri-plugin-macos-permissions-api");
 
 export const useApp = () => {
   const [enabledSources, setEnabledSources] = useState({
@@ -44,17 +49,6 @@ export const useApp = () => {
   const autoStopMinutesId = useId();
   const autoStopSecondsId = useId();
 
-  const loadTauriMacosPermissions =
-    useCallback(async (): Promise<TauriMacosPermissionsModule | null> => {
-      try {
-        const module = await import("tauri-plugin-macos-permissions-api");
-        return module;
-      } catch (err) {
-        console.warn("Failed to load Tauri macOS permissions plugin", err);
-        return null;
-      }
-    }, []);
-
   useEffect(() => {
     if (mediaSupportStatus !== "pending") {
       return;
@@ -75,12 +69,16 @@ export const useApp = () => {
         return;
       }
 
-      const permissions = await loadTauriMacosPermissions();
-      if (!permissions) {
+      const permissionsAvailable =
+        typeof checkMicrophonePermission === "function" ||
+        typeof checkCameraPermission === "function" ||
+        typeof checkScreenRecordingPermission === "function";
+
+      if (!permissionsAvailable) {
         if (!disposed) {
           setMediaSupportStatus("unsupported");
           setMediaSupportMessage(
-            "メディア関連の権限プラグインを読み込めませんでした。アプリを再起動してください。",
+            "メディア関連の権限プラグインを利用できませんでした。アプリを再起動してください。",
           );
         }
         return;
@@ -123,41 +121,30 @@ export const useApp = () => {
         return false;
       };
 
-      const checkScreenPermission =
-        permissions.checkScreenRecordingPermission ??
-        ((permissions as Record<string, unknown>)
-          .checkScreenCapturePermission as
-          | (() => Promise<boolean>)
-          | undefined);
-      const requestScreenPermission =
-        permissions.requestScreenRecordingPermission ??
-        ((permissions as Record<string, unknown>)
-          .requestScreenCapturePermission as
-          | (() => Promise<boolean>)
-          | undefined);
-
       const [microphoneGranted, cameraGranted, screenGranted] =
         await Promise.all([
           ensurePermission(
-            permissions.checkMicrophonePermission
-              ? () => permissions.checkMicrophonePermission()
+            typeof checkMicrophonePermission === "function"
+              ? () => checkMicrophonePermission()
               : undefined,
-            permissions.requestMicrophonePermission
-              ? () => permissions.requestMicrophonePermission()
-              : undefined,
-          ),
-          ensurePermission(
-            permissions.checkCameraPermission
-              ? () => permissions.checkCameraPermission()
-              : undefined,
-            permissions.requestCameraPermission
-              ? () => permissions.requestCameraPermission()
+            typeof requestMicrophonePermission === "function"
+              ? () => requestMicrophonePermission()
               : undefined,
           ),
           ensurePermission(
-            checkScreenPermission ? () => checkScreenPermission() : undefined,
-            requestScreenPermission
-              ? () => requestScreenPermission()
+            typeof checkCameraPermission === "function"
+              ? () => checkCameraPermission()
+              : undefined,
+            typeof requestCameraPermission === "function"
+              ? () => requestCameraPermission()
+              : undefined,
+          ),
+          ensurePermission(
+            typeof checkScreenRecordingPermission === "function"
+              ? () => checkScreenRecordingPermission()
+              : undefined,
+            typeof requestScreenRecordingPermission === "function"
+              ? () => requestScreenRecordingPermission()
               : undefined,
           ),
         ]);
@@ -212,7 +199,7 @@ export const useApp = () => {
     return () => {
       disposed = true;
     };
-  }, [loadTauriMacosPermissions, mediaSupportStatus]);
+  }, [mediaSupportStatus]);
 
   const autoStopDurationSeconds = useMemo(() => {
     const minutesRaw = Number(autoStopMinutesInput);
