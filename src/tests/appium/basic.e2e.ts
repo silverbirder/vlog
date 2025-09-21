@@ -81,13 +81,13 @@ async function main() {
     console.log('✅ 画面上に "Vlog Recorder" ヘッダーが確認できました');
 
     const startButton = await client.$(
-      "xpath://XCUIElementTypeButton[contains(@label,'まとめて開始') or contains(@title,'まとめて開始')]",
+      "xpath://XCUIElementTypeButton[contains(@label,'開始') or contains(@title,'開始')]",
     );
     await startButton.waitForExist({ timeout: 10_000 });
     if (!(await startButton.isEnabled())) {
-      throw new Error("まとめて開始ボタンが無効のままです");
+      throw new Error("開始ボタンが無効のままです");
     }
-    console.log("✅ まとめて開始ボタンは操作可能です");
+    console.log("✅ 開始ボタンは操作可能です");
 
     const stopButton = await client.$(
       "xpath://XCUIElementTypeButton[contains(@label,'停止') or contains(@title,'停止')]",
@@ -98,7 +98,7 @@ async function main() {
     }
     console.log("✅ 停止ボタンは初期状態で無効になっています");
 
-    console.log("ℹ️ まとめて開始ボタンをクリックします");
+    console.log("ℹ️ 開始ボタンをクリックします");
     await startButton.click();
 
     await stopButton.waitForEnabled({ timeout: 20_000 });

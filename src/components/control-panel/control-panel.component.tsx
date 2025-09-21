@@ -137,7 +137,7 @@ export const ControlPanel = (props: Props) => {
           onClick={startAll}
           type="button"
         >
-          まとめて開始
+          開始
         </button>
         <button
           className="warning"
