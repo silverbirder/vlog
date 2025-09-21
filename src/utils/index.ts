@@ -1,3 +1,5 @@
+export * from "./permissions";
+
 export const formatDuration = (totalSeconds: number): string => {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
     return "0秒";

@@ -1,20 +1,15 @@
 import {
   isPermissionGranted,
-  requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import {
-  checkCameraPermission,
-  checkMicrophonePermission,
-  checkScreenRecordingPermission,
-  requestCameraPermission,
-  requestMicrophonePermission,
-  requestScreenRecordingPermission,
-} from "tauri-plugin-macos-permissions-api";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
-import { formatDuration } from "@/utils";
+import {
+  ensureMacosMediaPermissions,
+  ensureNotificationPermissionStatus,
+  formatDuration,
+} from "@/utils";
 
 type StopAllOptions = {
   auto?: boolean;
@@ -63,55 +58,8 @@ export const useApp = () => {
         return;
       }
 
-      const normalizePermissionResult = (value: unknown): boolean => {
-        if (typeof value === "boolean") {
-          return value;
-        }
-        if (typeof value === "string") {
-          const normalized = value.toLowerCase();
-          return [
-            "granted",
-            "authorized",
-            "authorizedalways",
-            "authorizedwheninuse",
-            "promptallowed",
-          ].includes(normalized);
-        }
-        return false;
-      };
-
-      const ensurePermission = async (
-        check?: () => Promise<unknown>,
-        request?: () => Promise<unknown>,
-      ): Promise<boolean> => {
-        try {
-          if (check) {
-            const granted = await check();
-            if (normalizePermissionResult(granted)) {
-              return true;
-            }
-          }
-          if (request) {
-            return normalizePermissionResult(await request());
-          }
-        } catch (err) {
-          console.warn("Failed to ensure macOS permission", err);
-        }
-        return false;
-      };
-
-      const [microphoneGranted, cameraGranted, screenGranted] =
-        await Promise.all([
-          ensurePermission(
-            checkMicrophonePermission,
-            requestMicrophonePermission,
-          ),
-          ensurePermission(checkCameraPermission, requestCameraPermission),
-          ensurePermission(
-            checkScreenRecordingPermission,
-            requestScreenRecordingPermission,
-          ),
-        ]);
+      const { microphoneGranted, cameraGranted, screenGranted } =
+        await ensureMacosMediaPermissions();
 
       const navigatorAvailableAfter = Boolean(
         globalThis.navigator?.mediaDevices,
@@ -223,15 +171,9 @@ export const useApp = () => {
 
   const ensureNotificationPermission = useCallback(async () => {
     try {
-      if (await isPermissionGranted()) {
-        setTauriNotificationPermission("granted");
-        return;
-      }
-      const permission = await requestPermission();
-      if (permission === "granted") {
-        setTauriNotificationPermission("granted");
-      } else if (permission === "denied") {
-        setTauriNotificationPermission("denied");
+      const status = await ensureNotificationPermissionStatus();
+      if (status !== "unknown") {
+        setTauriNotificationPermission(status);
       }
     } catch (err) {
       console.warn("Failed to request Tauri notification permission", err);
