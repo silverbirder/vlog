@@ -305,12 +305,16 @@ export const useApp = () => {
   ]);
 
   const downloadAll = useCallback(async () => {
+    const sharedTimestamp = new Date();
+
     for (const { controller, defaultDownloadName } of controllerEntries) {
       if (!controller.mediaUrl) {
         continue;
       }
 
-      await controller.download(defaultDownloadName);
+      await controller.download(defaultDownloadName, {
+        timestamp: sharedTimestamp,
+      });
     }
   }, [controllerEntries]);
 

@@ -158,12 +158,15 @@ export function useMediaRecorder(
   const download = useCallback(
     async (
       defaultName = kind === "audio" ? "audio-recording" : "video-recording",
+      options?: {
+        timestamp?: Date;
+      },
     ) => {
       if (!mediaUrl) {
         return;
       }
 
-      const now = new Date();
+      const now = options?.timestamp ?? new Date();
       const timestamp = `${now.getFullYear()}-${String(
         now.getMonth() + 1,
       ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
