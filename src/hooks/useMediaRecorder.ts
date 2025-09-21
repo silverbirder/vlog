@@ -62,6 +62,27 @@ export function useMediaRecorder(
     }
   }, [mediaUrl]);
 
+  const reset = useCallback(() => {
+    if (recorderRef.current?.state === "recording") {
+      return;
+    }
+
+    revokeUrl();
+    setMediaUrl(null);
+    setError(null);
+    setStatus("idle");
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    setStream(null);
+    chunksRef.current = [];
+    recorderRef.current = null;
+  }, [revokeUrl]);
+
   useEffect(
     () => () => {
       revokeUrl();
@@ -77,9 +98,7 @@ export function useMediaRecorder(
       return;
     }
 
-    revokeUrl();
-    setMediaUrl(null);
-    setError(null);
+    reset();
 
     try {
       const streamResult = await getStream();
@@ -147,7 +166,7 @@ export function useMediaRecorder(
       setError(message);
       setStatus("error");
     }
-  }, [getStream, kind, revokeUrl, status]);
+  }, [getStream, kind, reset, status]);
 
   const stop = useCallback(() => {
     if (recorderRef.current && status === "recording") {
@@ -224,6 +243,7 @@ export function useMediaRecorder(
     isRecording: status === "recording",
     mediaUrl,
     mimeType: mimeRef.current,
+    reset,
     start,
     status,
     stop,

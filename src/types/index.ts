@@ -12,6 +12,7 @@ export type MediaRecorderController = {
   isRecording: boolean;
   start: () => Promise<void>;
   stop: () => void;
+  reset: () => void;
   download: (
     defaultName?: string,
     options?: {

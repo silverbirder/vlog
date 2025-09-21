@@ -270,6 +270,12 @@ export const useApp = () => {
     try {
       let didStartAny = false;
 
+      controllerEntries.forEach(({ key, controller }) => {
+        if (!enabledSources[key]) {
+          controller.reset();
+        }
+      });
+
       for (const { key, controller } of controllerEntries) {
         if (!enabledSources[key]) {
           continue;
