@@ -239,12 +239,6 @@ export const useApp = () => {
   }, []);
 
   const getScreenStream = useCallback(async () => {
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      throw new Error(
-        "このプラットフォームでは画面録画がサポートされていません。",
-      );
-    }
-
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
       audio: true,
       video: { displaySurface: "monitor" },
@@ -270,10 +264,6 @@ export const useApp = () => {
   }, []);
 
   const getCameraStream = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("カメラが利用できません。");
-    }
-
     return navigator.mediaDevices.getUserMedia({
       audio: true,
       video: { height: 720, width: 1280 },
@@ -281,10 +271,6 @@ export const useApp = () => {
   }, []);
 
   const getAudioStream = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("マイクが利用できません。");
-    }
-
     return navigator.mediaDevices.getUserMedia({ audio: true });
   }, []);
 
