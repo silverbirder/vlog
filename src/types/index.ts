@@ -1,5 +1,9 @@
 type RecorderStatus = "idle" | "recording" | "stopped" | "error";
 
+export type TauriNotificationPermission = "unknown" | "granted" | "denied";
+
+export type MediaSupportStatus = "pending" | "supported" | "unsupported";
+
 export type MediaRecorderController = {
   status: RecorderStatus;
   error: string | null;

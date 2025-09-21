@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAutoStop } from "@/hooks/useAutoStop";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
-import type { MediaRecorderController } from "@/types";
+import type {
+  MediaRecorderController,
+  MediaSupportStatus,
+  TauriNotificationPermission,
+} from "@/types";
 import {
   ensureMacosMediaPermissions,
   ensureNotificationPermissionStatus,
@@ -22,10 +26,9 @@ export const useApp = () => {
   });
   const [isStartingAll, setIsStartingAll] = useState(false);
   const [tauriNotificationPermission, setTauriNotificationPermission] =
-    useState<"unknown" | "granted" | "denied">("unknown");
-  const [mediaSupportStatus, setMediaSupportStatus] = useState<
-    "pending" | "supported" | "unsupported"
-  >("pending");
+    useState<TauriNotificationPermission>("unknown");
+  const [mediaSupportStatus, setMediaSupportStatus] =
+    useState<MediaSupportStatus>("pending");
   const [mediaSupportMessage, setMediaSupportMessage] = useState("");
 
   const {
