@@ -3,14 +3,7 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   checkCameraPermission,
   checkMicrophonePermission,
@@ -23,6 +16,11 @@ import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
 import { formatDuration } from "@/utils";
 
+type StopAllOptions = {
+  auto?: boolean;
+  durationSeconds?: number;
+};
+
 export const useApp = () => {
   const [enabledSources, setEnabledSources] = useState({
     audio: false,
@@ -32,8 +30,8 @@ export const useApp = () => {
   const [isStartingAll, setIsStartingAll] = useState(false);
   const [autoStopMinutesInput, setAutoStopMinutesInput] = useState("15");
   const [autoStopSecondsInput, setAutoStopSecondsInput] = useState("0");
-  const autoStopTimerRef = useRef<number | null>(null);
-  const autoStopDurationSecondsRef = useRef<number | null>(null);
+  const [scheduledAutoStopSecondsState, setScheduledAutoStopSecondsState] =
+    useState<number | null>(null);
   const [autoStopDeadline, setAutoStopDeadline] = useState<Date | null>(null);
   const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
   const [tauriNotificationPermission, setTauriNotificationPermission] =
@@ -202,13 +200,8 @@ export const useApp = () => {
   }, [autoStopDurationSeconds]);
 
   const clearAutoStopTimer = useCallback(() => {
-    if (autoStopTimerRef.current !== null) {
-      const timeoutId = autoStopTimerRef.current;
-      window.clearTimeout(timeoutId);
-      autoStopTimerRef.current = null;
-    }
-    autoStopDurationSecondsRef.current = null;
     setAutoStopDeadline(null);
+    setScheduledAutoStopSecondsState(null);
   }, []);
 
   const notifyAutoStop = useCallback(async (durationSeconds: number) => {
@@ -339,10 +332,10 @@ export const useApp = () => {
   );
 
   const scheduledAutoStopSeconds =
-    autoStopDurationSecondsRef.current ?? autoStopDurationSeconds ?? null;
+    scheduledAutoStopSecondsState ?? autoStopDurationSeconds ?? null;
 
   useEffect(() => {
-    if (!isAnyRecording && autoStopTimerRef.current !== null) {
+    if (!isAnyRecording) {
       clearAutoStopTimer();
     }
   }, [clearAutoStopTimer, isAnyRecording]);
@@ -354,9 +347,9 @@ export const useApp = () => {
   }, [clearAutoStopTimer]);
 
   const stopAll = useCallback(
-    (options?: { auto?: boolean; durationSeconds?: number }) => {
+    (options: StopAllOptions = {}) => {
       const secondsForNotification =
-        options?.durationSeconds ?? autoStopDurationSecondsRef.current ?? null;
+        options.durationSeconds ?? scheduledAutoStopSecondsState ?? null;
 
       clearAutoStopTimer();
 
@@ -366,7 +359,7 @@ export const useApp = () => {
         }
       });
 
-      if (options?.auto && secondsForNotification) {
+      if (options.auto && secondsForNotification) {
         const label = formatDuration(secondsForNotification);
         const baseMessage = `指定した${label}が経過したため、自動的に停止しました。`;
 
@@ -379,17 +372,46 @@ export const useApp = () => {
         }
 
         void notifyAutoStop(secondsForNotification);
-      } else if (!options?.auto) {
+      } else if (!options.auto) {
         setAutoStopMessage(null);
       }
     },
     [
       clearAutoStopTimer,
       controllerEntries,
+      scheduledAutoStopSecondsState,
       tauriNotificationPermission,
       notifyAutoStop,
     ],
   );
+
+  useEffect(() => {
+    if (!autoStopDeadline || scheduledAutoStopSecondsState === null) {
+      return;
+    }
+
+    const now = Date.now();
+    const remaining = autoStopDeadline.getTime() - now;
+
+    if (remaining <= 0) {
+      stopAll({
+        auto: true,
+        durationSeconds: scheduledAutoStopSecondsState,
+      });
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      stopAll({
+        auto: true,
+        durationSeconds: scheduledAutoStopSecondsState,
+      });
+    }, remaining);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [autoStopDeadline, scheduledAutoStopSecondsState, stopAll]);
 
   const startAll = useCallback(async () => {
     if (isStartingAll || isAnyRecording || !isAnyEnabled) {
@@ -424,11 +446,7 @@ export const useApp = () => {
       }
 
       if (didStartAny && autoStopDurationMs && autoStopDurationSeconds) {
-        autoStopDurationSecondsRef.current = autoStopDurationSeconds;
-        const timeoutId = window.setTimeout(() => {
-          stopAll({ auto: true, durationSeconds: autoStopDurationSeconds });
-        }, autoStopDurationMs);
-        autoStopTimerRef.current = timeoutId;
+        setScheduledAutoStopSecondsState(autoStopDurationSeconds);
         setAutoStopDeadline(new Date(Date.now() + autoStopDurationMs));
       }
     } finally {
@@ -446,7 +464,6 @@ export const useApp = () => {
     isAnyRecording,
     isStartingAll,
     ensureNotificationPermission,
-    stopAll,
   ]);
 
   const resetAll = useCallback(() => {
