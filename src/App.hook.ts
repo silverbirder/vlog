@@ -40,12 +40,8 @@ export const useApp = () => {
     useState<"unknown" | "granted" | "denied">("unknown");
   const [mediaSupportStatus, setMediaSupportStatus] = useState<
     "pending" | "supported" | "unsupported"
-  >(globalThis.navigator?.mediaDevices ? "supported" : "pending");
-  const [mediaSupportMessage, setMediaSupportMessage] = useState(
-    globalThis.navigator?.mediaDevices
-      ? ""
-      : "このマシンはメディアデバイス API をサポートしていません。",
-  );
+  >("pending");
+  const [mediaSupportMessage, setMediaSupportMessage] = useState("");
   const autoStopMinutesId = useId();
   const autoStopSecondsId = useId();
 
@@ -65,21 +61,6 @@ export const useApp = () => {
         if (!disposed) {
           setMediaSupportStatus("supported");
           setMediaSupportMessage("");
-        }
-        return;
-      }
-
-      const permissionsAvailable =
-        typeof checkMicrophonePermission === "function" ||
-        typeof checkCameraPermission === "function" ||
-        typeof checkScreenRecordingPermission === "function";
-
-      if (!permissionsAvailable) {
-        if (!disposed) {
-          setMediaSupportStatus("unsupported");
-          setMediaSupportMessage(
-            "メディア関連の権限プラグインを利用できませんでした。アプリを再起動してください。",
-          );
         }
         return;
       }
@@ -124,28 +105,13 @@ export const useApp = () => {
       const [microphoneGranted, cameraGranted, screenGranted] =
         await Promise.all([
           ensurePermission(
-            typeof checkMicrophonePermission === "function"
-              ? () => checkMicrophonePermission()
-              : undefined,
-            typeof requestMicrophonePermission === "function"
-              ? () => requestMicrophonePermission()
-              : undefined,
+            checkMicrophonePermission,
+            requestMicrophonePermission,
           ),
+          ensurePermission(checkCameraPermission, requestCameraPermission),
           ensurePermission(
-            typeof checkCameraPermission === "function"
-              ? () => checkCameraPermission()
-              : undefined,
-            typeof requestCameraPermission === "function"
-              ? () => requestCameraPermission()
-              : undefined,
-          ),
-          ensurePermission(
-            typeof checkScreenRecordingPermission === "function"
-              ? () => checkScreenRecordingPermission()
-              : undefined,
-            typeof requestScreenRecordingPermission === "function"
-              ? () => requestScreenRecordingPermission()
-              : undefined,
+            checkScreenRecordingPermission,
+            requestScreenRecordingPermission,
           ),
         ]);
 
