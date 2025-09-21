@@ -1,3 +1,4 @@
+import "./video-stream.css";
 import { useVideoStream } from "./video-stream.hook";
 
 type Props = {

@@ -58,7 +58,7 @@ export const useApp = () => {
 
     const evaluateSupport = async () => {
       const navigatorAvailableInitially = Boolean(
-        globalThis.navigator?.mediaDevices
+        globalThis.navigator?.mediaDevices,
       );
 
       if (navigatorAvailableInitially) {
@@ -73,7 +73,7 @@ export const useApp = () => {
         await ensureMacosMediaPermissions();
 
       const navigatorAvailableAfter = Boolean(
-        globalThis.navigator?.mediaDevices
+        globalThis.navigator?.mediaDevices,
       );
 
       if (disposed) {
@@ -92,7 +92,7 @@ export const useApp = () => {
 
       setMediaSupportStatus("unsupported");
       setMediaSupportMessage(
-        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。"
+        "必要な権限が付与されていないため、録画機能を利用できません。システム設定 > プライバシーとセキュリティ でカメラ・マイク・画面収録を許可してください。",
       );
     };
 
@@ -190,21 +190,21 @@ export const useApp = () => {
         key: "audio",
       },
     ],
-    [audioRecorder, cameraRecorder, screenRecorder]
+    [audioRecorder, cameraRecorder, screenRecorder],
   );
 
   const isAnyRecording = controllerEntries.some(
-    ({ controller }) => controller.isRecording
+    ({ controller }) => controller.isRecording,
   );
   const isAnyEnabled = Object.values(enabledSources).some(Boolean);
   const canResetAll = controllerEntries.some(
     ({ controller }) =>
       controller.mediaUrl !== null ||
       controller.status === "error" ||
-      controller.status === "stopped"
+      controller.status === "stopped",
   );
   const hasDownloads = controllerEntries.some(
-    ({ controller }) => controller.mediaUrl
+    ({ controller }) => controller.mediaUrl,
   );
 
   useEffect(() => {
@@ -234,7 +234,7 @@ export const useApp = () => {
         const baseMessage = `指定した${label}が経過したため、自動的に停止しました。`;
         if (tauriNotificationPermission === "denied") {
           setAutoStopMessage(
-            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`
+            `${baseMessage} デスクトップアプリの通知権限が拒否されています。システムの通知設定を確認してください。`,
           );
         } else {
           setAutoStopMessage(baseMessage);
@@ -251,7 +251,7 @@ export const useApp = () => {
       tauriNotificationPermission,
       setAutoStopMessage,
       notifyAutoStop,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -270,7 +270,7 @@ export const useApp = () => {
     const notificationPermissionPromise = ensureNotificationPermission().catch(
       (err) => {
         console.warn("Notification permission check failed", err);
-      }
+      },
     );
 
     try {

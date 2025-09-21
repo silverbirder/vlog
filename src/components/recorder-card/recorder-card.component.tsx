@@ -1,5 +1,6 @@
 import { VideoStream } from "@/components";
 import type { MediaRecorderController } from "@/types";
+import "./recorder-card.css";
 import { useRecorderCard } from "./recorder-card.hook";
 
 const FALLBACK_CAPTIONS_SRC = "data:text/vtt,WEBVTT";

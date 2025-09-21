@@ -1,0 +1,18 @@
+.live-preview {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #0f172a;
+  object-fit: cover;
+  min-height: 180px;
+}
+
+.live-preview.mirrored {
+  transform: scaleX(-1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .live-preview {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+}

@@ -1,5 +1,6 @@
 import type { UseAppReturn } from "@/App.hook";
 import { formatDuration } from "@/utils";
+import "./control-panel.css";
 import { useControlPanel } from "./control-panel.hook";
 
 type Props = Pick<
