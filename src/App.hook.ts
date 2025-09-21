@@ -1,4 +1,9 @@
 import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
+import {
   useCallback,
   useEffect,
   useId,
@@ -10,7 +15,6 @@ import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
 import { formatDuration } from "@/utils";
 
-type TauriNotificationModule = typeof import("@tauri-apps/plugin-notification");
 type TauriMacosPermissionsModule =
   typeof import("tauri-plugin-macos-permissions-api");
 
@@ -39,17 +43,6 @@ export const useApp = () => {
   );
   const autoStopMinutesId = useId();
   const autoStopSecondsId = useId();
-
-  const loadTauriNotification =
-    useCallback(async (): Promise<TauriNotificationModule | null> => {
-      try {
-        const module = await import("@tauri-apps/plugin-notification");
-        return module;
-      } catch (err) {
-        console.warn("Failed to load Tauri notification plugin", err);
-        return null;
-      }
-    }, []);
 
   const loadTauriMacosPermissions =
     useCallback(async (): Promise<TauriMacosPermissionsModule | null> => {
@@ -265,49 +258,39 @@ export const useApp = () => {
     setAutoStopDeadline(null);
   }, []);
 
-  const notifyAutoStop = useCallback(
-    async (durationSeconds: number) => {
-      const label = formatDuration(durationSeconds);
-      const title = "録画を停止しました";
-      const body = `指定した${label}が経過したため、自動停止しました。`;
+  const notifyAutoStop = useCallback(async (durationSeconds: number) => {
+    const label = formatDuration(durationSeconds);
+    const title = "録画を停止しました";
+    const body = `指定した${label}が経過したため、自動停止しました。`;
 
-      const tauriNotification = await loadTauriNotification();
-      if (tauriNotification) {
-        try {
-          const granted = await tauriNotification.isPermissionGranted();
-          if (granted) {
-            await tauriNotification.sendNotification({ body, title });
-            return;
-          }
-          setTauriNotificationPermission("denied");
-        } catch (err) {
-          console.warn("Failed to send Tauri notification", err);
-        }
+    try {
+      const granted = await isPermissionGranted();
+      if (granted) {
+        await sendNotification({ body, title });
+        return;
       }
-    },
-    [loadTauriNotification],
-  );
+      setTauriNotificationPermission("denied");
+    } catch (err) {
+      console.warn("Failed to send Tauri notification", err);
+    }
+  }, []);
 
   const ensureNotificationPermission = useCallback(async () => {
-    const tauriNotification = await loadTauriNotification();
-    if (tauriNotification) {
-      try {
-        if (await tauriNotification.isPermissionGranted()) {
-          setTauriNotificationPermission("granted");
-          return;
-        }
-        const permission = await tauriNotification.requestPermission();
-        if (permission === "granted") {
-          setTauriNotificationPermission("granted");
-        } else if (permission === "denied") {
-          setTauriNotificationPermission("denied");
-        }
+    try {
+      if (await isPermissionGranted()) {
+        setTauriNotificationPermission("granted");
         return;
-      } catch (err) {
-        console.warn("Failed to request Tauri notification permission", err);
       }
+      const permission = await requestPermission();
+      if (permission === "granted") {
+        setTauriNotificationPermission("granted");
+      } else if (permission === "denied") {
+        setTauriNotificationPermission("denied");
+      }
+    } catch (err) {
+      console.warn("Failed to request Tauri notification permission", err);
     }
-  }, [loadTauriNotification]);
+  }, []);
 
   const getScreenStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
