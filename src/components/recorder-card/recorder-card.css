@@ -1,19 +1,19 @@
 .card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding: 1.5rem;
+  background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
 }
 
 .card header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .card header > div {
@@ -33,16 +33,16 @@
 
 .status-row {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
+  align-items: center;
   font-weight: 600;
 }
 
 .indicator {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
   background: #d0d5dd;
+  border-radius: 50%;
   box-shadow: 0 0 0 3px rgba(208, 213, 221, 0.35);
 }
 
@@ -63,14 +63,14 @@
 
 .feature-toggle {
   display: inline-flex;
-  align-items: center;
   gap: 0.4rem;
+  align-items: center;
   padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.05);
   font-size: 0.85rem;
   font-weight: 600;
   color: #475467;
+  background: rgba(15, 23, 42, 0.05);
+  border-radius: 999px;
 }
 
 .feature-toggle input {
@@ -79,26 +79,26 @@
 }
 
 .feature-toggle.active {
-  background: rgba(37, 99, 235, 0.12);
   color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.12);
 }
 
 video.playback {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  object-fit: cover;
   max-height: 260px;
+  object-fit: cover;
   background: #000000;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
 }
 
 audio.playback {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  padding: 0.5rem;
   box-sizing: border-box;
+  width: 100%;
+  padding: 0.5rem;
   background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
 }
 
 .card-actions {
@@ -108,14 +108,14 @@ audio.playback {
 
 .card-actions button {
   flex: 1 1 120px;
-  border-radius: 10px;
-  border: none;
   padding: 0.65rem 1rem;
   font-size: 0.9rem;
   font-weight: 600;
   color: #ffffff;
-  background: #2563eb;
   cursor: pointer;
+  background: #2563eb;
+  border: none;
+  border-radius: 10px;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -126,29 +126,29 @@ audio.playback {
 }
 
 .card-actions button:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 8px 12px rgba(15, 23, 42, 0.15);
+  transform: translateY(-1px);
 }
 
 .card-actions button:disabled {
-  background: #d0d5dd;
   color: #98a2b3;
   cursor: not-allowed;
+  background: #d0d5dd;
   box-shadow: none;
 }
 
 .error {
+  padding: 0.6rem 0.9rem;
   margin: 0;
-  color: #b42318;
   font-size: 0.9rem;
+  color: #b42318;
   background: rgba(240, 68, 56, 0.08);
   border-radius: 12px;
-  padding: 0.6rem 0.9rem;
 }
 
 .muted {
-  color: #667085;
   font-size: 0.85rem;
+  color: #667085;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -167,8 +167,8 @@ audio.playback {
   }
 
   audio.playback {
-    border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(37, 99, 235, 0.25);
+    border: 1px solid rgba(148, 163, 184, 0.3);
   }
 
   .error {

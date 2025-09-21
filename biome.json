@@ -29,7 +29,8 @@
 			"source": {
 				"organizeImports": "on",
 				"useSortedKeys": "on",
-				"useSortedAttributes": "on"
+				"useSortedAttributes": "on",
+				"useSortedProperties": "on"
 			}
 		}
 	}

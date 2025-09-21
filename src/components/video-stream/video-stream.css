@@ -1,10 +1,10 @@
 .live-preview {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #0f172a;
-  object-fit: cover;
   min-height: 180px;
+  object-fit: cover;
+  background: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
 }
 
 .live-preview.mirrored {
