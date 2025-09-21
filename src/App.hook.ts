@@ -197,12 +197,6 @@ export const useApp = () => {
     ({ controller }) => controller.isRecording,
   );
   const isAnyEnabled = Object.values(enabledSources).some(Boolean);
-  const canResetAll = controllerEntries.some(
-    ({ controller }) =>
-      controller.mediaUrl !== null ||
-      controller.status === "error" ||
-      controller.status === "stopped",
-  );
   const hasDownloads = controllerEntries.some(
     ({ controller }) => controller.mediaUrl,
   );
@@ -278,7 +272,6 @@ export const useApp = () => {
 
       for (const { key, controller } of controllerEntries) {
         if (!enabledSources[key]) {
-          controller.reset();
           continue;
         }
 
@@ -311,14 +304,6 @@ export const useApp = () => {
     scheduleAutoStop,
   ]);
 
-  const resetAll = useCallback(() => {
-    clearAutoStop();
-    setAutoStopMessage(null);
-    controllerEntries.forEach(({ controller }) => {
-      controller.reset();
-    });
-  }, [clearAutoStop, controllerEntries, setAutoStopMessage]);
-
   const downloadAll = useCallback(() => {
     controllerEntries.forEach(({ controller, defaultDownloadName }) => {
       if (controller.mediaUrl) {
@@ -336,7 +321,6 @@ export const useApp = () => {
     autoStopSecondsId,
     autoStopSecondsInput,
     cameraRecorder,
-    canResetAll,
     downloadAll,
     enabledSources,
     hasDownloads,
@@ -345,7 +329,6 @@ export const useApp = () => {
     isStartingAll,
     mediaSupportMessage,
     mediaSupportStatus,
-    resetAll,
     scheduledAutoStopSeconds,
     screenRecorder,
     setAutoStopMinutesInput,

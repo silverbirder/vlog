@@ -22,11 +22,9 @@ type Props = Pick<
   | "scheduledAutoStopSeconds"
   | "isAnyRecording"
   | "isAnyEnabled"
-  | "canResetAll"
   | "hasDownloads"
   | "startAll"
   | "stopAll"
-  | "resetAll"
   | "downloadAll"
 >;
 
@@ -45,7 +43,6 @@ export const ControlPanel = (props: Props) => {
     autoStopMessage,
     scheduledAutoStopSeconds,
     startAll,
-    resetAll,
     downloadAll,
   } = props;
 
@@ -56,7 +53,6 @@ export const ControlPanel = (props: Props) => {
     handleStopAll,
     startDisabled,
     stopDisabled,
-    resetDisabled,
     downloadDisabled,
   } = useControlPanel(props);
 
@@ -151,15 +147,12 @@ export const ControlPanel = (props: Props) => {
         >
           停止
         </button>
-        <button disabled={resetDisabled} onClick={resetAll} type="button">
-          全リセット
-        </button>
         <button disabled={downloadDisabled} onClick={downloadAll} type="button">
           全て保存
         </button>
       </div>
       <p className="muted">
-        録画開始時に選択されている対象のみが同時にスタートします。停止すると各カードから個別保存やリセットが可能です。
+        録画開始時に選択されている対象のみが同時にスタートします。停止すると各カードから保存が可能です。
       </p>
     </section>
   );

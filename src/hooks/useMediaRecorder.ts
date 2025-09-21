@@ -155,14 +155,6 @@ export function useMediaRecorder(
     }
   }, [status]);
 
-  const reset = useCallback(() => {
-    stop();
-    revokeUrl();
-    setMediaUrl(null);
-    setStatus("idle");
-    setError(null);
-  }, [revokeUrl, stop]);
-
   const download = useCallback(
     (
       defaultName = kind === "audio" ? "audio-recording" : "video-recording",
@@ -231,7 +223,6 @@ export function useMediaRecorder(
     isRecording: status === "recording",
     mediaUrl,
     mimeType: mimeRef.current,
-    reset,
     start,
     status,
     stop,

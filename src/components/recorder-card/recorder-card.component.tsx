@@ -15,7 +15,6 @@ type Props = {
   onToggle: (value: boolean) => void;
   toggleDisabled?: boolean;
   onDownload?: () => void;
-  onReset?: () => void;
 };
 
 export const RecorderCard = ({
@@ -28,11 +27,12 @@ export const RecorderCard = ({
   onToggle,
   toggleDisabled,
   onDownload,
-  onReset,
 }: Props) => {
   const { status, error, mediaUrl, stream, isRecording } = controller;
-  const { statusLabel, handleDownload, handleReset, canReset } =
-    useRecorderCard({ controller, onDownload, onReset });
+  const { statusLabel, handleDownload } = useRecorderCard({
+    controller,
+    onDownload,
+  });
 
   return (
     <section className="card">
@@ -96,9 +96,6 @@ export const RecorderCard = ({
       <div className="card-actions">
         <button disabled={!mediaUrl} onClick={handleDownload} type="button">
           保存
-        </button>
-        <button disabled={!canReset} onClick={handleReset} type="button">
-          個別リセット
         </button>
       </div>
 

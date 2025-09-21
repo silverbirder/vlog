@@ -10,7 +10,6 @@ type Props = Pick<
   | "isAnyEnabled"
   | "isAnyRecording"
   | "isStartingAll"
-  | "canResetAll"
   | "hasDownloads"
   | "stopAll"
 >;
@@ -24,7 +23,6 @@ export const useControlPanel = ({
   isAnyEnabled,
   isAnyRecording,
   isStartingAll,
-  canResetAll,
   hasDownloads,
   stopAll,
 }: Props) => {
@@ -85,7 +83,6 @@ export const useControlPanel = ({
 
   const startDisabled = !isAnyEnabled || isAnyRecording || isStartingAll;
   const stopDisabled = !isAnyRecording;
-  const resetDisabled = isAnyRecording || !canResetAll;
   const downloadDisabled = !hasDownloads;
 
   return {
@@ -94,7 +91,6 @@ export const useControlPanel = ({
     handleAutoStopSecondsChange,
     handleStopAll,
     handleToggleSource,
-    resetDisabled,
     startDisabled,
     stopDisabled,
   } as const;

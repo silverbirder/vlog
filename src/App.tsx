@@ -20,11 +20,9 @@ function App() {
     mediaSupportMessage,
     isAnyRecording,
     isAnyEnabled,
-    canResetAll,
     hasDownloads,
     startAll,
     stopAll,
-    resetAll,
     downloadAll,
     autoStopMinutesId,
     autoStopSecondsId,
@@ -69,14 +67,12 @@ function App() {
         autoStopSecondsId={autoStopSecondsId}
         autoStopSecondsInput={autoStopSecondsInput}
         cameraRecorder={cameraRecorder}
-        canResetAll={canResetAll}
         downloadAll={downloadAll}
         enabledSources={enabledSources}
         hasDownloads={hasDownloads}
         isAnyEnabled={isAnyEnabled}
         isAnyRecording={isAnyRecording}
         isStartingAll={isStartingAll}
-        resetAll={resetAll}
         scheduledAutoStopSeconds={scheduledAutoStopSeconds}
         screenRecorder={screenRecorder}
         setAutoStopMinutesInput={setAutoStopMinutesInput}
@@ -93,7 +89,6 @@ function App() {
           enabled={enabledSources.screen}
           mediaKind="video"
           onDownload={() => screenRecorder.download("screen-recording")}
-          onReset={screenRecorder.reset}
           onToggle={(value) =>
             !screenRecorder.isRecording &&
             setEnabledSources((prev) => ({ ...prev, screen: value }))
@@ -107,7 +102,6 @@ function App() {
           enabled={enabledSources.camera}
           mediaKind="video"
           onDownload={() => cameraRecorder.download("camera-recording")}
-          onReset={cameraRecorder.reset}
           onToggle={(value) =>
             !cameraRecorder.isRecording &&
             setEnabledSources((prev) => ({ ...prev, camera: value }))
@@ -122,7 +116,6 @@ function App() {
           enabled={enabledSources.audio}
           mediaKind="audio"
           onDownload={() => audioRecorder.download("audio-recording")}
-          onReset={audioRecorder.reset}
           onToggle={(value) =>
             !audioRecorder.isRecording &&
             setEnabledSources((prev) => ({ ...prev, audio: value }))

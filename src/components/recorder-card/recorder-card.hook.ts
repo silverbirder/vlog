@@ -4,11 +4,10 @@ import type { MediaRecorderController } from "@/types";
 type Props = {
   controller: MediaRecorderController;
   onDownload?: () => void;
-  onReset?: () => void;
 };
 
-export const useRecorderCard = ({ controller, onDownload, onReset }: Props) => {
-  const { status, mediaUrl, download, reset, isRecording } = controller;
+export const useRecorderCard = ({ controller, onDownload }: Props) => {
+  const { status, download } = controller;
   const statusLabel = useMemo(() => {
     switch (status) {
       case "idle":
@@ -32,22 +31,8 @@ export const useRecorderCard = ({ controller, onDownload, onReset }: Props) => {
     }
   }, [download, onDownload]);
 
-  const handleReset = useCallback(() => {
-    if (onReset) {
-      onReset();
-    } else {
-      reset();
-    }
-  }, [onReset, reset]);
-
-  const canReset =
-    !isRecording &&
-    (mediaUrl !== null || status === "error" || status === "stopped");
-
   return {
-    canReset,
     handleDownload,
-    handleReset,
     statusLabel,
   } as const;
 };
