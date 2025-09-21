@@ -61,28 +61,6 @@
   box-shadow: 0 0 0 3px rgba(247, 144, 9, 0.25);
 }
 
-.feature-toggle {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475467;
-  background: rgba(15, 23, 42, 0.05);
-  border-radius: 999px;
-}
-
-.feature-toggle input {
-  width: 16px;
-  height: 16px;
-}
-
-.feature-toggle.active {
-  color: #1d4ed8;
-  background: rgba(37, 99, 235, 0.12);
-}
-
 video.playback {
   width: 100%;
   max-height: 260px;

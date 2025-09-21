@@ -86,42 +86,24 @@ function App() {
         <RecorderCard
           controller={screenRecorder}
           description="画面とシステム音声（利用可能な場合）をキャプチャします。"
-          enabled={enabledSources.screen}
           mediaKind="video"
           onDownload={() => screenRecorder.download("screen-recording")}
-          onToggle={(value) =>
-            !screenRecorder.isRecording &&
-            setEnabledSources((prev) => ({ ...prev, screen: value }))
-          }
           title="スクリーン録画"
-          toggleDisabled={screenRecorder.isRecording}
         />
         <RecorderCard
           controller={cameraRecorder}
           description="Web カメラとマイクを使って動画を撮影します。"
-          enabled={enabledSources.camera}
           mediaKind="video"
           onDownload={() => cameraRecorder.download("camera-recording")}
-          onToggle={(value) =>
-            !cameraRecorder.isRecording &&
-            setEnabledSources((prev) => ({ ...prev, camera: value }))
-          }
           previewMirror
           title="カメラ録画"
-          toggleDisabled={cameraRecorder.isRecording}
         />
         <RecorderCard
           controller={audioRecorder}
           description="マイク入力のみを収録します。"
-          enabled={enabledSources.audio}
           mediaKind="audio"
           onDownload={() => audioRecorder.download("audio-recording")}
-          onToggle={(value) =>
-            !audioRecorder.isRecording &&
-            setEnabledSources((prev) => ({ ...prev, audio: value }))
-          }
           title="音声録音"
-          toggleDisabled={audioRecorder.isRecording}
         />
       </div>
 

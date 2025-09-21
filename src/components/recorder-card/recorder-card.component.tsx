@@ -11,9 +11,6 @@ type Props = {
   controller: MediaRecorderController;
   mediaKind: "video" | "audio";
   previewMirror?: boolean;
-  enabled: boolean;
-  onToggle: (value: boolean) => void;
-  toggleDisabled?: boolean;
   onDownload?: () => void;
 };
 
@@ -23,9 +20,6 @@ export const RecorderCard = ({
   controller,
   mediaKind,
   previewMirror,
-  enabled,
-  onToggle,
-  toggleDisabled,
   onDownload,
 }: Props) => {
   const { status, error, mediaUrl, stream, isRecording } = controller;
@@ -41,21 +35,6 @@ export const RecorderCard = ({
           <h2>{title}</h2>
           <p>{description}</p>
         </div>
-        <label className={`feature-toggle${enabled ? " active" : ""}`}>
-          <input
-            checked={enabled}
-            disabled={toggleDisabled}
-            onChange={(event) => {
-              const checked =
-                (event.target instanceof HTMLInputElement &&
-                  event.target.checked) ||
-                false;
-              onToggle(checked);
-            }}
-            type="checkbox"
-          />
-          <span>{enabled ? "使用中" : "無効"}</span>
-        </label>
       </header>
 
       <div className="status-row">
@@ -66,11 +45,7 @@ export const RecorderCard = ({
         )}
       </div>
 
-      {!enabled && (
-        <p className="muted">この録画タイプは現在オフになっています。</p>
-      )}
-
-      {enabled && stream && mediaKind === "video" && (
+      {stream && mediaKind === "video" && (
         <VideoStream mirrored={previewMirror} stream={stream} />
       )}
 
