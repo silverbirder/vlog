@@ -12,6 +12,6 @@ export type MediaRecorderController = {
   isRecording: boolean;
   start: () => Promise<void>;
   stop: () => void;
-  download: (defaultName?: string) => void;
+  download: (defaultName?: string) => Promise<void>;
   stream: MediaStream | null;
 };

@@ -11,7 +11,7 @@ type Props = {
   controller: MediaRecorderController;
   mediaKind: "video" | "audio";
   previewMirror?: boolean;
-  onDownload?: () => void;
+  onDownload?: () => Promise<void> | void;
 };
 
 export const RecorderCard = ({

@@ -87,14 +87,14 @@ function App() {
           controller={screenRecorder}
           description="画面とシステム音声（利用可能な場合）をキャプチャします。"
           mediaKind="video"
-          onDownload={() => screenRecorder.download("screen-recording")}
+          onDownload={() => void screenRecorder.download("screen-recording")}
           title="スクリーン録画"
         />
         <RecorderCard
           controller={cameraRecorder}
           description="Web カメラとマイクを使って動画を撮影します。"
           mediaKind="video"
-          onDownload={() => cameraRecorder.download("camera-recording")}
+          onDownload={() => void cameraRecorder.download("camera-recording")}
           previewMirror
           title="カメラ録画"
         />
@@ -102,7 +102,7 @@ function App() {
           controller={audioRecorder}
           description="マイク入力のみを収録します。"
           mediaKind="audio"
-          onDownload={() => audioRecorder.download("audio-recording")}
+          onDownload={() => void audioRecorder.download("audio-recording")}
           title="音声録音"
         />
       </div>

@@ -3,7 +3,7 @@ import type { MediaRecorderController } from "@/types";
 
 type Props = {
   controller: MediaRecorderController;
-  onDownload?: () => void;
+  onDownload?: () => Promise<void> | void;
 };
 
 export const useRecorderCard = ({ controller, onDownload }: Props) => {
@@ -25,9 +25,9 @@ export const useRecorderCard = ({ controller, onDownload }: Props) => {
 
   const handleDownload = useCallback(() => {
     if (onDownload) {
-      onDownload();
+      void onDownload();
     } else {
-      download();
+      void download();
     }
   }, [download, onDownload]);
 

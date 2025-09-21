@@ -304,12 +304,14 @@ export const useApp = () => {
     scheduleAutoStop,
   ]);
 
-  const downloadAll = useCallback(() => {
-    controllerEntries.forEach(({ controller, defaultDownloadName }) => {
-      if (controller.mediaUrl) {
-        controller.download(defaultDownloadName);
+  const downloadAll = useCallback(async () => {
+    for (const { controller, defaultDownloadName } of controllerEntries) {
+      if (!controller.mediaUrl) {
+        continue;
       }
-    });
+
+      await controller.download(defaultDownloadName);
+    }
   }, [controllerEntries]);
 
   return {

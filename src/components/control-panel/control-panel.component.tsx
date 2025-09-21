@@ -147,7 +147,11 @@ export const ControlPanel = (props: Props) => {
         >
           停止
         </button>
-        <button disabled={downloadDisabled} onClick={downloadAll} type="button">
+        <button
+          disabled={downloadDisabled}
+          onClick={() => void downloadAll()}
+          type="button"
+        >
           全て保存
         </button>
       </div>

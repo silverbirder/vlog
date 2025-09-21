@@ -156,7 +156,7 @@ export function useMediaRecorder(
   }, [status]);
 
   const download = useCallback(
-    (
+    async (
       defaultName = kind === "audio" ? "audio-recording" : "video-recording",
     ) => {
       if (!mediaUrl) {
@@ -193,26 +193,24 @@ export function useMediaRecorder(
         }
       }
 
-      void (async () => {
-        try {
-          setError(null);
-          const response = await fetch(mediaUrl);
-          const blob = await response.blob();
-          const suggestedPath = await save({
-            defaultPath: `${defaultName}_${timestamp}.${extension}`,
-          });
+      try {
+        setError(null);
+        const response = await fetch(mediaUrl);
+        const blob = await response.blob();
+        const suggestedPath = await save({
+          defaultPath: `${defaultName}_${timestamp}.${extension}`,
+        });
 
-          if (!suggestedPath) {
-            return;
-          }
-
-          const bytes = new Uint8Array(await blob.arrayBuffer());
-          await writeFile(suggestedPath, bytes);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          setError(message);
+        if (!suggestedPath) {
+          return;
         }
-      })();
+
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        await writeFile(suggestedPath, bytes);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+      }
     },
     [kind, mediaUrl],
   );
