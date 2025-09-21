@@ -1,7 +1,3 @@
-import {
-  isPermissionGranted,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import type { MediaRecorderController } from "@/types";
@@ -9,6 +5,7 @@ import {
   ensureMacosMediaPermissions,
   ensureNotificationPermissionStatus,
   formatDuration,
+  sendNotificationIfAllowed,
 } from "@/utils";
 
 type StopAllOptions = {
@@ -157,15 +154,12 @@ export const useApp = () => {
     const title = "録画を停止しました";
     const body = `指定した${label}が経過したため、自動停止しました。`;
 
-    try {
-      const granted = await isPermissionGranted();
-      if (granted) {
-        await sendNotification({ body, title });
-        return;
-      }
+    const result = await sendNotificationIfAllowed({ body, title });
+
+    if (result.status === "denied") {
       setTauriNotificationPermission("denied");
-    } catch (err) {
-      console.warn("Failed to send Tauri notification", err);
+    } else if (result.status === "error") {
+      console.warn("Failed to send Tauri notification", result.error);
     }
   }, []);
 

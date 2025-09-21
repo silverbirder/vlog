@@ -1,8 +1,4 @@
 import {
-  isPermissionGranted,
-  requestPermission,
-} from "@tauri-apps/plugin-notification";
-import {
   checkCameraPermission,
   checkMicrophonePermission,
   checkScreenRecordingPermission,
@@ -81,23 +77,3 @@ export const ensureMacosMediaPermissions =
 
     return { cameraGranted, microphoneGranted, screenGranted };
   };
-
-export const ensureNotificationPermissionStatus = async (): Promise<
-  "unknown" | "granted" | "denied"
-> => {
-  if (await isPermissionGranted()) {
-    return "granted";
-  }
-
-  const permission = await requestPermission();
-
-  if (permission === "granted") {
-    return "granted";
-  }
-
-  if (permission === "denied") {
-    return "denied";
-  }
-
-  return "unknown";
-};

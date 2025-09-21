@@ -1,3 +1,4 @@
+export * from "./notifications";
 export * from "./permissions";
 
 export const formatDuration = (totalSeconds: number): string => {
