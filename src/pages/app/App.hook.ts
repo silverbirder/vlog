@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAutoStop } from "@/hooks/useAutoStop";
-import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import { useAutoStop, useMediaRecorder } from "@/hooks";
 import type {
   MediaRecorderController,
   MediaSupportStatus,

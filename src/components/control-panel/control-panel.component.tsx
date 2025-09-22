@@ -1,4 +1,4 @@
-import type { UseAppReturn } from "@/App.hook";
+import type { UseAppReturn } from "@/pages/app/App.hook";
 import { formatDuration } from "@/utils";
 import "./control-panel.css";
 import { useControlPanel } from "./control-panel.hook";

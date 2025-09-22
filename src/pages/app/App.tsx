@@ -2,7 +2,7 @@ import "./App.css";
 import { ControlPanel, RecorderCard } from "@/components";
 import { useApp } from "./App.hook";
 
-function App() {
+export const App = () => {
   const {
     screenRecorder,
     cameraRecorder,
@@ -120,6 +120,4 @@ function App() {
       </footer>
     </main>
   );
-}
-
-export default App;
+};
