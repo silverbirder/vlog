@@ -1,6 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useCallback } from "react";
-import type { UseAppReturn } from "@/pages/app/App.hook";
+import type { UseAppReturn } from "@/pages";
 
 type Props = Pick<
   UseAppReturn,
