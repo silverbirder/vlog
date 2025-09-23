@@ -29,7 +29,31 @@ export const Test = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recording, setRecording] = useState(false);
   const [hasRecording, setHasRecording] = useState(false);
+  const [recordingMime, setRecordingMime] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  // queue to buffer chunks so ondataavailable returns fast
+  const chunkQueue = useRef<Uint8Array[]>([]);
+  const processingRef = useRef<boolean>(false);
+
+  const processQueue = async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    try {
+      while (chunkQueue.current.length > 0) {
+        const chunk = chunkQueue.current.shift();
+        if (!chunk) continue;
+        try {
+          // send chunk (await to preserve order)
+          // convert to regular array for invoke serialization
+          await invoke("append_chunk", { data: Array.from(chunk) });
+        } catch (e) {
+          console.error("invoke append_chunk failed", e);
+        }
+      }
+    } finally {
+      processingRef.current = false;
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -51,6 +75,12 @@ export const Test = () => {
       if (videoRef.current) videoRef.current.srcObject = s;
 
       const selected = pickSupportedMime();
+      setRecordingMime(selected);
+      try {
+        await invoke("init_recording", { mime: selected });
+      } catch (e) {
+        console.error("init_recording failed", e);
+      }
       const options: MediaRecorderOptions = selected
         ? { mimeType: selected }
         : {};
@@ -62,20 +92,22 @@ export const Test = () => {
       mr.ondataavailable = async (ev: BlobEvent) => {
         if (ev.data && ev.data.size > 0) {
           setHasRecording(true);
-          // Read blob as ArrayBuffer and send to backend
+          // Read blob as ArrayBuffer and enqueue for background send
           const ab = await ev.data.arrayBuffer();
           const u8 = new Uint8Array(ab);
-          // send chunk to Rust backend
-          try {
-            await invoke("append_chunk", { data: Array.from(u8) });
-          } catch (e) {
-            console.error("invoke append_chunk failed", e);
-          }
+          chunkQueue.current.push(u8);
+          // start background processing if not already
+          void processQueue();
         }
       };
 
       mr.onstop = async () => {
         try {
+          // wait until queued chunks are flushed
+          while (processingRef.current || chunkQueue.current.length > 0) {
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((r) => setTimeout(r, 100));
+          }
           await invoke("finalize_recording");
         } catch (e) {
           console.error("finalize_recording failed", e);
@@ -116,7 +148,12 @@ export const Test = () => {
           disabled={recording || !hasRecording}
           onClick={async () => {
             try {
-              const path = await save({ defaultPath: "vlog_recording.mp4" });
+              const defaultExt = recordingMime?.includes("webm")
+                ? "webm"
+                : "mp4";
+              const path = await save({
+                defaultPath: `vlog_recording.${defaultExt}`,
+              });
               if (path) {
                 const p = Array.isArray(path) ? path[0] : path;
                 // request bytes from backend
