@@ -28,6 +28,7 @@ export const Test = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recording, setRecording] = useState(false);
+  const [hasRecording, setHasRecording] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export const Test = () => {
 
       mr.ondataavailable = async (ev: BlobEvent) => {
         if (ev.data && ev.data.size > 0) {
+          setHasRecording(true);
           // Read blob as ArrayBuffer and send to backend
           const ab = await ev.data.arrayBuffer();
           const u8 = new Uint8Array(ab);
@@ -81,6 +83,7 @@ export const Test = () => {
       };
 
       mediaRecorderRef.current = mr;
+      setHasRecording(false);
       mr.start(1000); // deliver data every second
       setRecording(true);
     } catch (e) {
@@ -110,6 +113,7 @@ export const Test = () => {
           Stop
         </button>
         <button
+          disabled={recording || !hasRecording}
           onClick={async () => {
             try {
               const path = await save({ defaultPath: "vlog_recording.mp4" });
@@ -143,10 +147,6 @@ export const Test = () => {
           style={{ maxHeight: 480, width: "100%" }}
         />
       </div>
-      <p style={{ marginTop: 8 }}>
-        This MVP streams webm chunks to the Rust backend which will append them
-        to a file.
-      </p>
     </div>
   );
 };
