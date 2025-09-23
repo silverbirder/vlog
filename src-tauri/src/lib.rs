@@ -77,41 +77,6 @@ fn finalize_recording() -> Result<String, String> {
 }
 
 #[tauri::command]
-fn save_recording(dest: String) -> Result<String, String> {
-    // copy from temp output path to destination
-    if let Some(cell) = OUTPUT_PATH.get() {
-        // if recording still active, refuse
-        let guard = cell.lock();
-        if guard.is_some() {
-            return Err("recording still in progress".into());
-        }
-    }
-
-    // Try to find the temp file path used earlier (from LAST_OUTPUT_PATH)
-    let mut candidate: Option<PathBuf> = None;
-    if let Some(last) = LAST_OUTPUT_PATH.get() {
-        let last_guard = last.lock();
-        if let Some(ref p) = *last_guard {
-            candidate = Some(p.clone());
-        }
-    }
-
-    // fallback
-    let tmp = if let Some(p) = candidate { p } else {
-        let mut t = std::env::temp_dir();
-        t.push("vlog_recording.mp4");
-        t
-    };
-
-    if !tmp.exists() {
-        return Err("no recording found".into());
-    }
-
-    std::fs::copy(&tmp, &dest).map_err(|e| format!("copy error: {}", e))?;
-    Ok(format!("saved to {}", dest))
-}
-
-#[tauri::command]
 fn read_recording() -> Result<Vec<u8>, String> {
     // Try to use last known output path, fallback to default mp4
     let mut candidate: Option<PathBuf> = None;
@@ -148,7 +113,6 @@ pub fn run() {
             append_chunk,
             init_recording,
             finalize_recording,
-            save_recording,
             read_recording
         ])
         .run(tauri::generate_context!())
