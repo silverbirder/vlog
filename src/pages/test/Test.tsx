@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
 
 function pickSupportedMime(): string | null {
@@ -63,6 +64,13 @@ export const Test = () => {
 
   const startCapture = async () => {
     try {
+      // Select save directory
+      const selectedDir = await open({ directory: true });
+      if (!selectedDir) return; // User cancelled
+      const savePath = Array.isArray(selectedDir)
+        ? selectedDir[0]
+        : selectedDir;
+
       const s = await (navigator.mediaDevices as MediaDevices).getDisplayMedia({
         audio: true,
         video: true,
@@ -72,7 +80,7 @@ export const Test = () => {
 
       const selected = pickSupportedMime();
       try {
-        await invoke("init_recording", { mime: selected });
+        await invoke("init_recording", { mime: selected, path: savePath });
       } catch (e) {
         console.error("init_recording failed", e);
       }

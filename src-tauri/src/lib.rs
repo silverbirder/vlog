@@ -10,8 +10,12 @@ static OUTPUT_PATH: OnceCell<Mutex<Option<PathBuf>>> = OnceCell::new();
 static LAST_OUTPUT_PATH: OnceCell<Mutex<Option<PathBuf>>> = OnceCell::new();
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+async fn get_desktop_path(app: tauri::AppHandle) -> Result<String, String> {
+    let desktop = app
+        .path()
+        .desktop_dir()
+        .map_err(|e| format!("failed to get desktop dir: {}", e))?;
+    Ok(desktop.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -42,26 +46,30 @@ fn append_chunk(data: Vec<u8>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn init_recording(app: tauri::AppHandle, mime: Option<String>) -> Result<String, String> {
-    let app_data_dir = app.path().desktop_dir().map_err(|e| format!("failed to get desktop dir: {}", e))?;
+async fn init_recording(path: String, mime: Option<String>) -> Result<String, String> {
+    let output_dir = PathBuf::from(path);
     let ext = if let Some(m) = mime {
-        if m.contains("webm") { "webm" } else { "mp4" }
+        if m.contains("webm") {
+            "webm"
+        } else {
+            "mp4"
+        }
     } else {
         "mp4"
     };
     let filename = format!("vlog_recording.{}", ext);
-    let path = app_data_dir.join(filename);
-    let _ = std::fs::remove_file(&path);
+    let full_path = output_dir.join(filename);
+    let _ = std::fs::remove_file(&full_path);
 
     let cell = OUTPUT_PATH.get_or_init(|| Mutex::new(None));
     let mut guard = cell.lock();
-    *guard = Some(path.clone());
+    *guard = Some(full_path.clone());
 
     let last = LAST_OUTPUT_PATH.get_or_init(|| Mutex::new(None));
     let mut last_guard = last.lock();
-    *last_guard = Some(path.clone());
+    *last_guard = Some(full_path.clone());
 
-    Ok(format!("initialized: {}", path.display()))
+    Ok(format!("initialized: {}", full_path.display()))
 }
 
 #[tauri::command]
@@ -78,6 +86,32 @@ fn finalize_recording() -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+fn read_recording() -> Result<Vec<u8>, String> {
+    // Try to use last known output path, fallback to default mp4
+    let mut candidate: Option<PathBuf> = None;
+    if let Some(last) = LAST_OUTPUT_PATH.get() {
+        let last_guard = last.lock();
+        if let Some(ref p) = *last_guard {
+            candidate = Some(p.clone());
+        }
+    }
+
+    let tmp = if let Some(p) = candidate {
+        p
+    } else {
+        let mut t = std::env::temp_dir();
+        t.push("vlog_recording.mp4");
+        t
+    };
+
+    if !tmp.exists() {
+        return Err("no recording found".into());
+    }
+
+    std::fs::read(&tmp).map_err(|e| format!("read error: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -87,10 +121,11 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
+            get_desktop_path,
             append_chunk,
             init_recording,
             finalize_recording,
+            read_recording
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
