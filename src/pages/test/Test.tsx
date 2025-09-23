@@ -1,6 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
 import { useEffect, useRef, useState } from "react";
 
 function pickSupportedMime(): string | null {
@@ -28,8 +26,6 @@ export const Test = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recording, setRecording] = useState(false);
-  const [hasRecording, setHasRecording] = useState(false);
-  const [recordingMime, setRecordingMime] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   // queue to buffer chunks so ondataavailable returns fast
   const chunkQueue = useRef<Uint8Array[]>([]);
@@ -75,7 +71,6 @@ export const Test = () => {
       if (videoRef.current) videoRef.current.srcObject = s;
 
       const selected = pickSupportedMime();
-      setRecordingMime(selected);
       try {
         await invoke("init_recording", { mime: selected });
       } catch (e) {
@@ -91,7 +86,6 @@ export const Test = () => {
 
       mr.ondataavailable = async (ev: BlobEvent) => {
         if (ev.data && ev.data.size > 0) {
-          setHasRecording(true);
           // Read blob as ArrayBuffer and enqueue for background send
           const ab = await ev.data.arrayBuffer();
           const u8 = new Uint8Array(ab);
@@ -109,13 +103,13 @@ export const Test = () => {
             await new Promise((r) => setTimeout(r, 100));
           }
           await invoke("finalize_recording");
+          alert("Recording saved successfully!");
         } catch (e) {
           console.error("finalize_recording failed", e);
         }
       };
 
       mediaRecorderRef.current = mr;
-      setHasRecording(false);
       mr.start(1000); // deliver data every second
       setRecording(true);
     } catch (e) {
@@ -143,36 +137,6 @@ export const Test = () => {
         </button>
         <button disabled={!recording} onClick={stopCapture} type="button">
           Stop
-        </button>
-        <button
-          disabled={recording || !hasRecording}
-          onClick={async () => {
-            try {
-              const defaultExt = recordingMime?.includes("webm")
-                ? "webm"
-                : "mp4";
-              const path = await save({
-                defaultPath: `vlog_recording.${defaultExt}`,
-              });
-              if (path) {
-                const p = Array.isArray(path) ? path[0] : path;
-                // request bytes from backend
-                const bytes = (await invoke("read_recording")) as number[];
-                if (!bytes || bytes.length === 0) {
-                  alert("No recording data available");
-                  return;
-                }
-                // write using plugin-fs
-                await writeFile(p as string, new Uint8Array(bytes));
-                alert(`Saved: ${p}`);
-              }
-            } catch (e) {
-              console.error("save failed", e);
-            }
-          }}
-          type="button"
-        >
-          Save
         </button>
       </div>
       <div style={{ marginTop: 12 }}>
