@@ -8,6 +8,12 @@ type NotificationPayload = Parameters<typeof sendNotification>[0];
 
 export type NotificationPermissionStatus = "unknown" | "granted" | "denied";
 
+export const notificationPermissionStatus =
+  async (): Promise<NotificationPermissionStatus> => {
+    const granted = await isPermissionGranted();
+    return granted ? "granted" : "denied";
+  };
+
 export const ensureNotificationPermissionStatus =
   async (): Promise<NotificationPermissionStatus> => {
     if (await isPermissionGranted()) {
