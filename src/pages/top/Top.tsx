@@ -10,7 +10,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Bell, BellRing, FolderOpen, Play, Square } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  FolderOpen,
+  Play,
+  Square,
+  RefreshCcw,
+} from "lucide-react";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 export const Top = () => {
   const {
@@ -26,6 +40,13 @@ export const Top = () => {
     attachScreenRef,
     attachCameraRef,
     attachAudioRef,
+    cameraDevices,
+    microphoneDevices,
+    selectedCameraId,
+    setSelectedCameraId,
+    selectedMicId,
+    setSelectedMicId,
+    refreshDevices,
     autoMinutes,
     autoSeconds,
     setAutoMinutes,
@@ -126,7 +147,83 @@ export const Top = () => {
               </div>
               <Separator />
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-24 text-sm text-muted-foreground">自動停止</div>
+                <div className="min-w-24 text-sm text-muted-foreground">
+                  カメラ
+                </div>
+                <div className="flex flex-1 items-center justify-end gap-3 overflow-hidden">
+                  <Select
+                    disabled={recording}
+                    value={selectedCameraId}
+                    onValueChange={(v) => setSelectedCameraId(v as any)}
+                  >
+                    <SelectTrigger aria-label="カメラを選択">
+                      <SelectValue placeholder="システムデフォルト" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        システムデフォルト
+                      </SelectItem>
+                      {cameraDevices
+                        .filter((d) => d.deviceId && d.deviceId.length > 0)
+                        .map((d) => (
+                          <SelectItem key={d.deviceId} value={d.deviceId}>
+                            {d.label ||
+                              `カメラ (${d.deviceId.substring(0, 6)}…)`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void refreshDevices(true)}
+                  >
+                    <RefreshCcw /> 更新
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-24 text-sm text-muted-foreground">
+                  マイク
+                </div>
+                <div className="flex flex-1 items-center justify-end gap-3 overflow-hidden">
+                  <Select
+                    disabled={recording}
+                    value={selectedMicId}
+                    onValueChange={(v) => setSelectedMicId(v as any)}
+                  >
+                    <SelectTrigger aria-label="マイクを選択">
+                      <SelectValue placeholder="システムデフォルト" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        システムデフォルト
+                      </SelectItem>
+                      {microphoneDevices
+                        .filter((d) => d.deviceId && d.deviceId.length > 0)
+                        .map((d) => (
+                          <SelectItem key={d.deviceId} value={d.deviceId}>
+                            {d.label ||
+                              `マイク (${d.deviceId.substring(0, 6)}…)`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void refreshDevices(true)}
+                  >
+                    <RefreshCcw /> 更新
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-24 text-sm text-muted-foreground">
+                  自動停止
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -134,7 +231,9 @@ export const Top = () => {
                     className="h-9 w-20 rounded-md border px-2 text-right"
                     value={autoMinutes}
                     disabled={recording}
-                    onChange={(e) => setAutoMinutes(Math.max(0, Number(e.target.value || 0)))}
+                    onChange={(e) =>
+                      setAutoMinutes(Math.max(0, Number(e.target.value || 0)))
+                    }
                   />
                   <span className="text-sm text-muted-foreground">分</span>
                   <input

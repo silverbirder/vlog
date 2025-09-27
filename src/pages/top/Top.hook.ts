@@ -6,6 +6,7 @@ import {
   notificationPermissionStatus,
   ensureNotificationPermissionStatus,
   sendNotificationIfAllowed,
+  ensureMacosMediaPermissions,
 } from "@/utils";
 
 export const useTop = () => {
@@ -17,8 +18,20 @@ export const useTop = () => {
   const [autoMinutes, setAutoMinutes] = useState<number>(15);
   const [autoSeconds, setAutoSeconds] = useState<number>(0);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>(
+    []
+  );
+  const [selectedCameraId, setSelectedCameraId] = useState<string | "default">(
+    "default"
+  );
+  const [selectedMicId, setSelectedMicId] = useState<string | "default">(
+    "default"
+  );
 
   const SAVE_DIR_KEY = "vlog.saveDir" as const;
+  const CAMERA_ID_KEY = "vlog.cameraId" as const;
+  const MIC_ID_KEY = "vlog.micId" as const;
 
   useEffect(() => {
     const fetchPermissionStatus = async () => {
@@ -39,9 +52,79 @@ export const useTop = () => {
         }
       } catch {}
     };
+    const initSelectedDevices = () => {
+      try {
+        const cam = localStorage.getItem(CAMERA_ID_KEY);
+        if (cam && cam !== "default" && cam.length > 0) {
+          setSelectedCameraId(cam as string);
+        } else {
+          setSelectedCameraId("default");
+          localStorage.setItem(CAMERA_ID_KEY, "default");
+        }
+        const mic = localStorage.getItem(MIC_ID_KEY);
+        if (mic && mic !== "default" && mic.length > 0) {
+          setSelectedMicId(mic as string);
+        } else {
+          setSelectedMicId("default");
+          localStorage.setItem(MIC_ID_KEY, "default");
+        }
+      } catch {
+        setSelectedCameraId("default");
+        setSelectedMicId("default");
+      }
+    };
     fetchPermissionStatus();
     initSaveDir();
+    initSelectedDevices();
   }, []);
+
+  const refreshDevices = useCallback(async (requestAccess = false) => {
+    try {
+      if (requestAccess) {
+        try {
+          await ensureMacosMediaPermissions();
+        } catch {}
+        try {
+          const tmp = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: true,
+          });
+          tmp.getTracks().forEach((t) => t.stop());
+        } catch (e) {
+          console.warn("temporary getUserMedia failed", e);
+        }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setCameraDevices(devices.filter((d) => d.kind === "videoinput"));
+      setMicrophoneDevices(devices.filter((d) => d.kind === "audioinput"));
+    } catch (e) {
+      console.warn("enumerateDevices failed", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshDevices();
+    const handler = () => void refreshDevices();
+    navigator.mediaDevices?.addEventListener?.("devicechange", handler);
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
+    };
+  }, [refreshDevices]);
+
+  useEffect(() => {
+    if (
+      selectedCameraId !== "default" &&
+      !cameraDevices.some((d) => d.deviceId === selectedCameraId)
+    ) {
+      setSelectedCameraId("default");
+    }
+    if (
+      selectedMicId !== "default" &&
+      !microphoneDevices.some((d) => d.deviceId === selectedMicId)
+    ) {
+      setSelectedMicId("default");
+    }
+  }, [cameraDevices, microphoneDevices]);
 
   const requestNotificationPermission = useCallback(async () => {
     const status = await ensureNotificationPermissionStatus();
@@ -151,6 +234,7 @@ export const useTop = () => {
       // Screen
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
+        audio: true,
       });
       screenStreamRef.current = screenStream;
       const videoMime = pickSupportedVideoMime();
@@ -174,9 +258,16 @@ export const useTop = () => {
       screenMrRef.current = screenMr;
 
       // Camera
-      const cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
+      const cameraConstraints: MediaStreamConstraints = {
+        video:
+          selectedCameraId && selectedCameraId !== "default"
+            ? { deviceId: { exact: selectedCameraId } }
+            : true,
+        audio: true,
+      };
+      const cameraStream = await navigator.mediaDevices.getUserMedia(
+        cameraConstraints
+      );
       cameraStreamRef.current = cameraStream;
       await invoke("init_recording", {
         path: saveDirectory,
@@ -198,9 +289,15 @@ export const useTop = () => {
       cameraMrRef.current = cameraMr;
 
       // Audio
-      const audioStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
+      const audioConstraints: MediaStreamConstraints = {
+        audio:
+          selectedMicId && selectedMicId !== "default"
+            ? { deviceId: { exact: selectedMicId } }
+            : true,
+      };
+      const audioStream = await navigator.mediaDevices.getUserMedia(
+        audioConstraints
+      );
       audioStreamRef.current = audioStream;
       const audioMime = pickSupportedAudioMime();
       await invoke("init_recording", {
@@ -256,7 +353,13 @@ export const useTop = () => {
       console.error("startAll failed", e);
       alert("開始に失敗しました。権限や環境を確認してください。");
     }
-  }, [saveDirectory, autoMinutes, autoSeconds]);
+  }, [
+    saveDirectory,
+    autoMinutes,
+    autoSeconds,
+    selectedCameraId,
+    selectedMicId,
+  ]);
 
   const stopAll = useCallback(async (reason: "manual" | "auto" = "manual") => {
     try {
@@ -357,6 +460,25 @@ export const useTop = () => {
     recording,
     monitorAudio,
     setMonitorAudio,
+    cameraDevices,
+    microphoneDevices,
+    selectedCameraId,
+    setSelectedCameraId: (id: string | "default") => {
+      setSelectedCameraId(id);
+      try {
+        if (id === "default") localStorage.removeItem(CAMERA_ID_KEY);
+        else localStorage.setItem(CAMERA_ID_KEY, id);
+      } catch {}
+    },
+    selectedMicId,
+    setSelectedMicId: (id: string | "default") => {
+      setSelectedMicId(id);
+      try {
+        if (id === "default") localStorage.removeItem(MIC_ID_KEY);
+        else localStorage.setItem(MIC_ID_KEY, id);
+      } catch {}
+    },
+    refreshDevices,
     autoMinutes,
     autoSeconds,
     setAutoMinutes,
