@@ -13,6 +13,7 @@ export const useTop = () => {
     useState<NotificationPermissionStatus>("unknown");
   const [saveDirectory, setSaveDirectory] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [monitorAudio, setMonitorAudio] = useState(false);
 
   const SAVE_DIR_KEY = "vlog.saveDir" as const;
 
@@ -265,6 +266,26 @@ export const useTop = () => {
     }
   }, []);
 
+  // Live preview attachers (used as callback refs in JSX)
+  const attachScreenRef = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    el.srcObject = recording ? screenStreamRef.current : null;
+    if (recording && el.srcObject) void el.play().catch(() => {});
+  }, [recording]);
+
+  const attachCameraRef = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    el.srcObject = recording ? cameraStreamRef.current : null;
+    if (recording && el.srcObject) void el.play().catch(() => {});
+  }, [recording]);
+
+  const attachAudioRef = useCallback((el: HTMLAudioElement | null) => {
+    if (!el) return;
+    el.srcObject = recording ? audioStreamRef.current : null;
+    el.muted = !monitorAudio;
+    if (recording && el.srcObject && monitorAudio) void el.play().catch(() => {});
+  }, [recording, monitorAudio]);
+
   return {
     notificationPermission,
     canRequest,
@@ -273,6 +294,11 @@ export const useTop = () => {
     saveDirectory,
     chooseSaveDirectory,
     recording,
+    monitorAudio,
+    setMonitorAudio,
+    attachScreenRef,
+    attachCameraRef,
+    attachAudioRef,
     startAll,
     stopAll,
   } as const;

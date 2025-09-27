@@ -21,6 +21,11 @@ export const Top = () => {
     saveDirectory,
     chooseSaveDirectory,
     recording,
+    monitorAudio,
+    setMonitorAudio,
+    attachScreenRef,
+    attachCameraRef,
+    attachAudioRef,
     startAll,
     stopAll,
   } = useTop();
@@ -109,6 +114,46 @@ export const Top = () => {
                   </Button>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+      <section className="mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>ライブプレビュー</CardTitle>
+            <CardDescription>
+              共有中の画面とカメラを表示します。音声モニターはデフォルトでミュートです。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
+              <video
+                ref={attachScreenRef}
+                className="absolute inset-0 h-full w-full object-contain"
+                playsInline
+                muted
+                autoPlay
+              />
+              <video
+                ref={attachCameraRef}
+                className="absolute bottom-3 right-3 w-1/4 aspect-video rounded-md ring-2 ring-white/60 bg-black"
+                playsInline
+                muted
+                autoPlay
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={monitorAudio}
+                  onChange={(e) => setMonitorAudio(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                音声モニター（ハウリングに注意）
+              </label>
+              <audio ref={attachAudioRef} hidden />
             </div>
           </CardContent>
         </Card>
