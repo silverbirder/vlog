@@ -224,7 +224,7 @@ export const useTop = () => {
 
   const pickSupportedAudioMime = (): string | null => {
     if (typeof MediaRecorder === "undefined") return null;
-    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
     for (const m of candidates) {
       if (MediaRecorder.isTypeSupported(m)) return m;
     }
@@ -291,7 +291,7 @@ export const useTop = () => {
       // Camera (video only)
       const cameraStream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: false,
+        audio: true,
       });
       cameraStreamRef.current = cameraStream;
       await invoke("init_recording", {
@@ -362,7 +362,6 @@ export const useTop = () => {
             ? cameraQueueRef.current
             : audioQueueRef.current;
         while (processing.current[id] || queue.length > 0) {
-          // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 100));
         }
         await invoke("finalize_recording", { id });

@@ -7,9 +7,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use tauri::Manager;
 
-// Support multiple concurrent recordings keyed by an ID (e.g., "screen", "camera", "audio").
 static OUTPUT_PATHS: OnceCell<Mutex<HashMap<String, PathBuf>>> = OnceCell::new();
-// Note: previously tracked last paths for `read_recording`, now removed as unused.
 
 #[tauri::command]
 async fn get_desktop_path(app: tauri::AppHandle) -> Result<String, String> {
@@ -41,12 +39,18 @@ fn append_chunk(data: Vec<u8>, id: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn init_recording(path: String, mime: Option<String>, id: Option<String>) -> Result<String, String> {
+async fn init_recording(
+    path: String,
+    mime: Option<String>,
+    id: Option<String>,
+) -> Result<String, String> {
     let output_dir = PathBuf::from(path);
     let key = id.unwrap_or_else(|| "default".to_string());
     let ext = if let Some(m) = mime {
         if m.contains("webm") {
             "webm"
+        } else if key == "audio" {
+            "m4a"
         } else {
             "mp4"
         }
@@ -65,8 +69,6 @@ async fn init_recording(path: String, mime: Option<String>, id: Option<String>) 
     let mut map = map_cell.lock();
     map.insert(key.clone(), full_path.clone());
 
-    // no-op: no last path tracking needed without `read_recording`
-
     Ok(format!("initialized: {}", full_path.display()))
 }
 
@@ -84,8 +86,6 @@ fn finalize_recording(id: Option<String>) -> Result<String, String> {
         Err("no active recording".into())
     }
 }
-
-// `read_recording` has been removed as it was unused.
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
