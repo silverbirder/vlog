@@ -263,7 +263,10 @@ export const useTop = () => {
           selectedCameraId && selectedCameraId !== "default"
             ? { deviceId: { exact: selectedCameraId } }
             : true,
-        audio: true,
+        audio:
+          selectedMicId && selectedMicId !== "default"
+            ? { deviceId: { exact: selectedMicId } }
+            : true,
       };
       const cameraStream = await navigator.mediaDevices.getUserMedia(
         cameraConstraints
