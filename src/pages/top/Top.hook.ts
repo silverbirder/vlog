@@ -207,7 +207,6 @@ export const useTop = () => {
   const processing = useRef<{ [k: string]: boolean }>({});
 
   const pickSupportedVideoMime = (): string | null => {
-    if (typeof MediaRecorder === "undefined") return null;
     const candidates = [
       "video/mp4;codecs=h264,aac",
       "video/mp4;codecs=h264",
@@ -223,7 +222,6 @@ export const useTop = () => {
   };
 
   const pickSupportedAudioMime = (): string | null => {
-    if (typeof MediaRecorder === "undefined") return null;
     const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
     for (const m of candidates) {
       if (MediaRecorder.isTypeSupported(m)) return m;
@@ -266,7 +264,6 @@ export const useTop = () => {
       const getDisplayMedia = navigator.mediaDevices?.getDisplayMedia?.bind(
         navigator.mediaDevices
       );
-      if (!getDisplayMedia) throw new Error("getDisplayMedia not supported");
       const screenStream = await getDisplayMedia({ video: true, audio: true });
       screenStreamRef.current = screenStream;
       const videoMime = pickSupportedVideoMime();
@@ -276,7 +273,7 @@ export const useTop = () => {
         id: "screen",
       });
       const screenMr = new MediaRecorder(
-        screenStream as MediaStream,
+        screenStream,
         videoMime ? { mimeType: videoMime } : {}
       );
       screenMr.ondataavailable = async (ev: BlobEvent) => {
@@ -288,7 +285,7 @@ export const useTop = () => {
       };
       screenMrRef.current = screenMr;
 
-      // Camera (video only)
+      // Camera
       const cameraStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
@@ -300,7 +297,7 @@ export const useTop = () => {
         id: "camera",
       });
       const cameraMr = new MediaRecorder(
-        cameraStream as MediaStream,
+        cameraStream,
         videoMime ? { mimeType: videoMime } : {}
       );
       cameraMr.ondataavailable = async (ev: BlobEvent) => {
@@ -312,10 +309,9 @@ export const useTop = () => {
       };
       cameraMrRef.current = cameraMr;
 
-      // Audio (microphone only)
+      // Audio
       const audioStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: false,
       });
       audioStreamRef.current = audioStream;
       const audioMime = pickSupportedAudioMime();
