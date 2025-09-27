@@ -26,6 +26,11 @@ export const Top = () => {
     attachScreenRef,
     attachCameraRef,
     attachAudioRef,
+    autoMinutes,
+    autoSeconds,
+    setAutoMinutes,
+    setAutoSeconds,
+    remainingMs,
     startAll,
     stopAll,
   } = useTop();
@@ -57,12 +62,17 @@ export const Top = () => {
             className="min-w-32"
             size="lg"
             variant="outline"
-            onClick={() => void stopAll()}
+            onClick={() => void stopAll("manual")}
             disabled={!recording}
           >
             <Square /> 停止
           </Button>
         </div>
+        {recording && typeof remainingMs === "number" ? (
+          <div className="mt-3 text-sm text-muted-foreground">
+            自動停止まで {new Date(remainingMs).toISOString().substring(14, 19)}
+          </div>
+        ) : null}
       </section>
       <section>
         <Card>
@@ -112,6 +122,35 @@ export const Top = () => {
                   <Button size="sm" onClick={() => void chooseSaveDirectory()}>
                     <FolderOpen /> 選択
                   </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-24 text-sm text-muted-foreground">自動停止</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    className="h-9 w-20 rounded-md border px-2 text-right"
+                    value={autoMinutes}
+                    disabled={recording}
+                    onChange={(e) => setAutoMinutes(Math.max(0, Number(e.target.value || 0)))}
+                  />
+                  <span className="text-sm text-muted-foreground">分</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    className="h-9 w-20 rounded-md border px-2 text-right"
+                    value={autoSeconds}
+                    disabled={recording}
+                    onChange={(e) =>
+                      setAutoSeconds(
+                        Math.min(59, Math.max(0, Number(e.target.value || 0)))
+                      )
+                    }
+                  />
+                  <span className="text-sm text-muted-foreground">秒</span>
                 </div>
               </div>
             </div>

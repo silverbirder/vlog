@@ -14,6 +14,9 @@ export const useTop = () => {
   const [saveDirectory, setSaveDirectory] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [monitorAudio, setMonitorAudio] = useState(false);
+  const [autoMinutes, setAutoMinutes] = useState<number>(15);
+  const [autoSeconds, setAutoSeconds] = useState<number>(0);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
 
   const SAVE_DIR_KEY = "vlog.saveDir" as const;
 
@@ -80,6 +83,9 @@ export const useTop = () => {
   const cameraQueueRef = useRef<Uint8Array[]>([]);
   const audioQueueRef = useRef<Uint8Array[]>([]);
   const processing = useRef<{ [k: string]: boolean }>({});
+  const autoStopTimeoutRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
+  const autoStopAtRef = useRef<number | null>(null);
 
   const pickSupportedVideoMime = (): string | null => {
     const candidates = [
@@ -136,7 +142,11 @@ export const useTop = () => {
       }
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
-      const suffix = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const suffix = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+        now.getDate()
+      )}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(
+        now.getSeconds()
+      )}`;
 
       // Screen
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -217,17 +227,51 @@ export const useTop = () => {
       cameraMr.start(1000);
       audioMr.start(1000);
       setRecording(true);
+
+      const mins =
+        Number.isFinite(autoMinutes) && autoMinutes >= 0 ? autoMinutes : 15;
+      const secs =
+        Number.isFinite(autoSeconds) && autoSeconds >= 0 ? autoSeconds : 0;
+      const totalMs = (mins * 60 + secs) * 1000;
+      const durationMs = totalMs > 0 ? totalMs : 15 * 60 * 1000;
+
+      const endAt = Date.now() + durationMs;
+      autoStopAtRef.current = endAt;
+      setRemainingMs(durationMs);
+
+      if (autoStopTimeoutRef.current)
+        window.clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = window.setTimeout(() => {
+        void stopAll("auto");
+      }, durationMs);
+
+      if (countdownIntervalRef.current)
+        window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = window.setInterval(() => {
+        const now = Date.now();
+        const rem = Math.max(0, endAt - now);
+        setRemainingMs(rem);
+      }, 250);
     } catch (e) {
       console.error("startAll failed", e);
       alert("開始に失敗しました。権限や環境を確認してください。");
     }
-  }, [saveDirectory]);
+  }, [saveDirectory, autoMinutes, autoSeconds]);
 
-  const stopAll = useCallback(async () => {
+  const stopAll = useCallback(async (reason: "manual" | "auto" = "manual") => {
     try {
       screenMrRef.current?.stop();
       cameraMrRef.current?.stop();
       audioMrRef.current?.stop();
+
+      if (autoStopTimeoutRef.current) {
+        window.clearTimeout(autoStopTimeoutRef.current);
+        autoStopTimeoutRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        window.clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
 
       const waitFlush = async (id: "screen" | "camera" | "audio") => {
         const queue =
@@ -259,7 +303,14 @@ export const useTop = () => {
       cameraStreamRef.current = null;
       audioStreamRef.current = null;
       setRecording(false);
+      setRemainingMs(null);
       alert("保存が完了しました。");
+      if (reason === "auto") {
+        void sendNotificationIfAllowed({
+          title: "録画を自動停止しました",
+          body: "設定した時間に達したため、録画を自動停止しました。",
+        });
+      }
     } catch (e) {
       console.error("stopAll failed", e);
       alert("停止に失敗しました");
@@ -267,24 +318,34 @@ export const useTop = () => {
   }, []);
 
   // Live preview attachers (used as callback refs in JSX)
-  const attachScreenRef = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    el.srcObject = recording ? screenStreamRef.current : null;
-    if (recording && el.srcObject) void el.play().catch(() => {});
-  }, [recording]);
+  const attachScreenRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (!el) return;
+      el.srcObject = recording ? screenStreamRef.current : null;
+      if (recording && el.srcObject) void el.play().catch(() => {});
+    },
+    [recording]
+  );
 
-  const attachCameraRef = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    el.srcObject = recording ? cameraStreamRef.current : null;
-    if (recording && el.srcObject) void el.play().catch(() => {});
-  }, [recording]);
+  const attachCameraRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (!el) return;
+      el.srcObject = recording ? cameraStreamRef.current : null;
+      if (recording && el.srcObject) void el.play().catch(() => {});
+    },
+    [recording]
+  );
 
-  const attachAudioRef = useCallback((el: HTMLAudioElement | null) => {
-    if (!el) return;
-    el.srcObject = recording ? audioStreamRef.current : null;
-    el.muted = !monitorAudio;
-    if (recording && el.srcObject && monitorAudio) void el.play().catch(() => {});
-  }, [recording, monitorAudio]);
+  const attachAudioRef = useCallback(
+    (el: HTMLAudioElement | null) => {
+      if (!el) return;
+      el.srcObject = recording ? audioStreamRef.current : null;
+      el.muted = !monitorAudio;
+      if (recording && el.srcObject && monitorAudio)
+        void el.play().catch(() => {});
+    },
+    [recording, monitorAudio]
+  );
 
   return {
     notificationPermission,
@@ -296,6 +357,11 @@ export const useTop = () => {
     recording,
     monitorAudio,
     setMonitorAudio,
+    autoMinutes,
+    autoSeconds,
+    setAutoMinutes,
+    setAutoSeconds,
+    remainingMs,
     attachScreenRef,
     attachCameraRef,
     attachAudioRef,
