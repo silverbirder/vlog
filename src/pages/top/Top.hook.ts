@@ -43,15 +43,12 @@ export const useTop = () => {
           setSaveDirectory(stored);
           return;
         }
-        // fallback to desktop path for initial UX
         const desktop = (await invoke<string>("get_desktop_path")) ?? null;
         if (desktop) {
           setSaveDirectory(desktop);
           localStorage.setItem(SAVE_DIR_KEY, desktop);
         }
-      } catch {
-        // ignore failures; user can set manually
-      }
+      } catch {}
     };
     fetchPermissionStatus();
     initSaveDir();
@@ -108,7 +105,7 @@ export const useTop = () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: false,
+        video: true,
       });
       stopStream(stream);
       await sendNotificationIfAllowed({
@@ -136,7 +133,7 @@ export const useTop = () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: false,
+        audio: true,
       });
       stopStream(stream);
       await sendNotificationIfAllowed({
@@ -165,7 +162,7 @@ export const useTop = () => {
     }
     let stream: MediaStream | null = null;
     try {
-      stream = await getDisplayMedia({ video: true });
+      stream = await getDisplayMedia({ video: true, audio: true });
       stopStream(stream);
       await sendNotificationIfAllowed({
         title: "スクリーン検証",
