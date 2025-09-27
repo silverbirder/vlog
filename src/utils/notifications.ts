@@ -39,7 +39,7 @@ export type SendNotificationResult =
   | { status: "error"; error: unknown };
 
 export const sendNotificationIfAllowed = async (
-  payload: NotificationPayload,
+  payload: NotificationPayload
 ): Promise<SendNotificationResult> => {
   try {
     if (!(await isPermissionGranted())) {
