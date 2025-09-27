@@ -89,19 +89,6 @@ export const useTop = () => {
     return s;
   }, []);
 
-  const chooseSaveDirectory = useCallback(async () => {
-    try {
-      const dir = await open({ directory: true });
-      if (!dir) return null;
-      const selected = Array.isArray(dir) ? dir[0] : dir;
-      setSaveDirectory(selected);
-      localStorage.setItem(SAVE_DIR_KEY, selected);
-      return selected;
-    } catch {
-      return null;
-    }
-  }, []);
-
   const stopStream = (stream?: MediaStream | null) => {
     try {
       stream?.getTracks().forEach((t) => t.stop());
@@ -189,6 +176,19 @@ export const useTop = () => {
         title: "スクリーン検証",
         body: "取得に失敗しました",
       });
+    }
+  }, []);
+
+  const chooseSaveDirectory = useCallback(async () => {
+    try {
+      const dir = await open({ directory: true });
+      if (!dir) return null;
+      const selected = Array.isArray(dir) ? dir[0] : dir;
+      setSaveDirectory(selected);
+      localStorage.setItem(SAVE_DIR_KEY, selected);
+      return selected;
+    } catch {
+      return null;
     }
   }, []);
 
