@@ -43,6 +43,7 @@ async fn init_recording(
     path: String,
     mime: Option<String>,
     id: Option<String>,
+    suffix: Option<String>,
 ) -> Result<String, String> {
     let output_dir = PathBuf::from(path);
     let key = id.unwrap_or_else(|| "default".to_string());
@@ -57,10 +58,14 @@ async fn init_recording(
     } else {
         "mp4"
     };
-    let filename = if key == "default" {
-        format!("vlog_recording.{}", ext)
+    let base = if key == "default" {
+        "vlog_recording".to_string()
     } else {
-        format!("vlog_recording_{}.{}", key, ext)
+        format!("vlog_recording_{}", key)
+    };
+    let filename = match suffix {
+        Some(sfx) if !sfx.is_empty() => format!("{}_{}.{}", base, sfx, ext),
+        _ => format!("{}.{}", base, ext),
     };
     let full_path = output_dir.join(filename);
     let _ = std::fs::remove_file(&full_path);

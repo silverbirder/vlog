@@ -133,6 +133,9 @@ export const useTop = () => {
         alert("保存先を設定してください。");
         return;
       }
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const suffix = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
       // Screen
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -144,6 +147,7 @@ export const useTop = () => {
         path: saveDirectory,
         mime: videoMime,
         id: "screen",
+        suffix,
       });
       const screenMr = new MediaRecorder(
         screenStream,
@@ -167,6 +171,7 @@ export const useTop = () => {
         path: saveDirectory,
         mime: videoMime,
         id: "camera",
+        suffix,
       });
       const cameraMr = new MediaRecorder(
         cameraStream,
@@ -191,6 +196,7 @@ export const useTop = () => {
         path: saveDirectory,
         mime: audioMime,
         id: "audio",
+        suffix,
       });
       const audioMr = new MediaRecorder(
         audioStream as MediaStream,
