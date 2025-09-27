@@ -230,32 +230,13 @@ export const useTop = () => {
       )}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(
         now.getSeconds()
       )}`;
+      const videoMime = pickSupportedVideoMime();
 
-      // Screen
+      // Pre Screen
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
       });
-      screenStreamRef.current = screenStream;
-      const videoMime = pickSupportedVideoMime();
-      await invoke("init_recording", {
-        path: saveDirectory,
-        mime: videoMime,
-        id: "screen",
-        suffix,
-      });
-      const screenMr = new MediaRecorder(
-        screenStream,
-        videoMime ? { mimeType: videoMime } : {}
-      );
-      screenMr.ondataavailable = async (ev: BlobEvent) => {
-        if (ev.data && ev.data.size > 0) {
-          const ab = await ev.data.arrayBuffer();
-          screenQueueRef.current.push(new Uint8Array(ab));
-          void processQueue("screen");
-        }
-      };
-      screenMrRef.current = screenMr;
 
       // Camera
       const cameraConstraints: MediaStreamConstraints = {
@@ -321,6 +302,43 @@ export const useTop = () => {
         }
       };
       audioMrRef.current = audioMr;
+
+      // Screen with Audio
+      try {
+        const hasScreenAudio = screenStream.getAudioTracks().length > 0;
+        if (!hasScreenAudio) {
+          audioStream.getAudioTracks().forEach((t) => {
+            try {
+              screenStream.addTrack(t.clone());
+            } catch {
+              screenStream.addTrack(t);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to attach mic audio to screen stream", e);
+      }
+
+      // Post Screen
+      await invoke("init_recording", {
+        path: saveDirectory,
+        mime: videoMime,
+        id: "screen",
+        suffix,
+      });
+      screenStreamRef.current = screenStream;
+      const screenMr = new MediaRecorder(
+        screenStream,
+        videoMime ? { mimeType: videoMime } : {}
+      );
+      screenMr.ondataavailable = async (ev: BlobEvent) => {
+        if (ev.data && ev.data.size > 0) {
+          const ab = await ev.data.arrayBuffer();
+          screenQueueRef.current.push(new Uint8Array(ab));
+          void processQueue("screen");
+        }
+      };
+      screenMrRef.current = screenMr;
 
       // Start all
       screenMr.start(1000);
