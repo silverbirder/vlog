@@ -39,7 +39,7 @@ const normalizePermissionResult = (value: unknown): NormalizeResult => {
 
 const ensurePermission = async (
   check?: PermissionCheck,
-  request?: PermissionRequest,
+  request?: PermissionRequest
 ): Promise<boolean> => {
   try {
     if (check) {
@@ -65,64 +65,15 @@ export const ensureMacosMediaPermissions =
       [
         ensurePermission(
           checkMicrophonePermission,
-          requestMicrophonePermission,
+          requestMicrophonePermission
         ),
         ensurePermission(checkCameraPermission, requestCameraPermission),
         ensurePermission(
           checkScreenRecordingPermission,
-          requestScreenRecordingPermission,
+          requestScreenRecordingPermission
         ),
-      ],
+      ]
     );
 
     return { cameraGranted, microphoneGranted, screenGranted };
   };
-
-// ---- Additional helpers for granular status/request (no auto-prompt on status) ----
-
-export type MediaPermission = "microphone" | "camera" | "screen";
-export type MediaPermissionStatus = "granted" | "denied";
-
-const statusFrom = (granted: boolean): MediaPermissionStatus =>
-  granted ? "granted" : "denied";
-
-export const mediaPermissionsStatus = async (): Promise<{
-  microphone: MediaPermissionStatus;
-  camera: MediaPermissionStatus;
-  screen: MediaPermissionStatus;
-}> => {
-  const [mic, cam, scr] = await Promise.all([
-    checkMicrophonePermission(),
-    checkCameraPermission(),
-    checkScreenRecordingPermission(),
-  ]);
-  return {
-    camera: statusFrom(normalizePermissionResult(cam)),
-    microphone: statusFrom(normalizePermissionResult(mic)),
-    screen: statusFrom(normalizePermissionResult(scr)),
-  };
-};
-
-export const ensureMicrophonePermissionStatus = async (): Promise<MediaPermissionStatus> => {
-  const granted = await ensurePermission(
-    checkMicrophonePermission,
-    requestMicrophonePermission,
-  );
-  return statusFrom(granted);
-};
-
-export const ensureCameraPermissionStatus = async (): Promise<MediaPermissionStatus> => {
-  const granted = await ensurePermission(
-    checkCameraPermission,
-    requestCameraPermission,
-  );
-  return statusFrom(granted);
-};
-
-export const ensureScreenPermissionStatus = async (): Promise<MediaPermissionStatus> => {
-  const granted = await ensurePermission(
-    checkScreenRecordingPermission,
-    requestScreenRecordingPermission,
-  );
-  return statusFrom(granted);
-};

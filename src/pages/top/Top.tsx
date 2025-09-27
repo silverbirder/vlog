@@ -7,15 +7,6 @@ export const Top = () => {
     canRequest,
     requestNotificationPermission,
     sendTestNotification,
-    microphoneStatus,
-    cameraStatus,
-    screenStatus,
-    requestMicrophone,
-    requestCamera,
-    requestScreen,
-    validateMicrophone,
-    validateCamera,
-    validateScreen,
     saveDirectory,
     chooseSaveDirectory,
     recording,
@@ -40,55 +31,6 @@ export const Top = () => {
           onClick={() => void sendTestNotification()}
         >
           通知テスト
-        </Button>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="w-24 text-sm text-muted-foreground">マイク</span>
-        <span className="text-sm">{microphoneStatus}</span>
-        <Button
-          disabled={microphoneStatus === "granted"}
-          onClick={() => void requestMicrophone()}
-        >
-          権限をリクエスト
-        </Button>
-        <Button
-          disabled={microphoneStatus !== "granted"}
-          onClick={() => void validateMicrophone()}
-        >
-          マイクテスト
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="w-24 text-sm text-muted-foreground">カメラ</span>
-        <span className="text-sm">{cameraStatus}</span>
-        <Button
-          disabled={cameraStatus === "granted"}
-          onClick={() => void requestCamera()}
-        >
-          権限をリクエスト
-        </Button>
-        <Button
-          disabled={cameraStatus !== "granted"}
-          onClick={() => void validateCamera()}
-        >
-          カメラテスト
-        </Button>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="w-24 text-sm text-muted-foreground">スクリーン</span>
-        <span className="text-sm">{screenStatus}</span>
-        <Button
-          disabled={screenStatus === "granted"}
-          onClick={() => void requestScreen()}
-        >
-          権限をリクエスト
-        </Button>
-        <Button
-          disabled={screenStatus !== "granted"}
-          onClick={() => void validateScreen()}
-        >
-          スクリーンテスト
         </Button>
       </div>
       <div className="flex items-center gap-3">
