@@ -261,10 +261,9 @@ export const useTop = () => {
       }
 
       // Screen
-      const getDisplayMedia = navigator.mediaDevices?.getDisplayMedia?.bind(
-        navigator.mediaDevices
-      );
-      const screenStream = await getDisplayMedia({ video: true, audio: true });
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+      });
       screenStreamRef.current = screenStream;
       const videoMime = pickSupportedVideoMime();
       await invoke("init_recording", {
@@ -288,7 +287,6 @@ export const useTop = () => {
       // Camera
       const cameraStream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true,
       });
       cameraStreamRef.current = cameraStream;
       await invoke("init_recording", {
