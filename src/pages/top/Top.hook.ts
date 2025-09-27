@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   type NotificationPermissionStatus,
   notificationPermissionStatus,
@@ -20,6 +22,9 @@ export const useTop = () => {
     useState<MediaPermissionStatus>("denied");
   const [screenStatus, setScreenStatus] =
     useState<MediaPermissionStatus>("denied");
+  const [saveDirectory, setSaveDirectory] = useState<string | null>(null);
+
+  const SAVE_DIR_KEY = "vlog.saveDir" as const;
 
   useEffect(() => {
     const fetchPermissionStatus = async () => {
@@ -30,7 +35,25 @@ export const useTop = () => {
       setCameraStatus(media.camera);
       setScreenStatus(media.screen);
     };
+    const initSaveDir = async () => {
+      try {
+        const stored = localStorage.getItem(SAVE_DIR_KEY);
+        if (stored && stored.length > 0) {
+          setSaveDirectory(stored);
+          return;
+        }
+        // fallback to desktop path for initial UX
+        const desktop = (await invoke<string>("get_desktop_path")) ?? null;
+        if (desktop) {
+          setSaveDirectory(desktop);
+          localStorage.setItem(SAVE_DIR_KEY, desktop);
+        }
+      } catch {
+        // ignore failures; user can set manually
+      }
+    };
     fetchPermissionStatus();
+    initSaveDir();
   }, []);
 
   const requestNotificationPermission = useCallback(async () => {
@@ -64,6 +87,19 @@ export const useTop = () => {
     const s = await ensureScreenPermissionStatus();
     setScreenStatus(s);
     return s;
+  }, []);
+
+  const chooseSaveDirectory = useCallback(async () => {
+    try {
+      const dir = await open({ directory: true });
+      if (!dir) return null;
+      const selected = Array.isArray(dir) ? dir[0] : dir;
+      setSaveDirectory(selected);
+      localStorage.setItem(SAVE_DIR_KEY, selected);
+      return selected;
+    } catch {
+      return null;
+    }
   }, []);
 
   const stopStream = (stream?: MediaStream | null) => {
@@ -170,5 +206,7 @@ export const useTop = () => {
     validateMicrophone,
     validateCamera,
     validateScreen,
+    saveDirectory,
+    chooseSaveDirectory,
   } as const;
 };
