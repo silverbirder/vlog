@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -23,6 +23,7 @@ export const useTop = () => {
   const [screenStatus, setScreenStatus] =
     useState<MediaPermissionStatus>("denied");
   const [saveDirectory, setSaveDirectory] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
 
   const SAVE_DIR_KEY = "vlog.saveDir" as const;
 
@@ -192,6 +193,205 @@ export const useTop = () => {
     }
   }, []);
 
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
+  const screenMrRef = useRef<MediaRecorder | null>(null);
+  const cameraMrRef = useRef<MediaRecorder | null>(null);
+  const audioMrRef = useRef<MediaRecorder | null>(null);
+
+  const screenQueueRef = useRef<Uint8Array[]>([]);
+  const cameraQueueRef = useRef<Uint8Array[]>([]);
+  const audioQueueRef = useRef<Uint8Array[]>([]);
+  const processing = useRef<{ [k: string]: boolean }>({});
+
+  const pickSupportedVideoMime = (): string | null => {
+    if (typeof MediaRecorder === "undefined") return null;
+    const candidates = [
+      "video/mp4;codecs=h264,aac",
+      "video/mp4;codecs=h264",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
+    for (const m of candidates) {
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return null;
+  };
+
+  const pickSupportedAudioMime = (): string | null => {
+    if (typeof MediaRecorder === "undefined") return null;
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    for (const m of candidates) {
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return null;
+  };
+
+  const processQueue = async (id: "screen" | "camera" | "audio") => {
+    if (processing.current[id]) return;
+    processing.current[id] = true;
+    try {
+      const queue =
+        id === "screen"
+          ? screenQueueRef.current
+          : id === "camera"
+          ? cameraQueueRef.current
+          : audioQueueRef.current;
+      while (queue.length > 0) {
+        const chunk = queue.shift();
+        if (!chunk) continue;
+        try {
+          await invoke("append_chunk", { data: Array.from(chunk), id });
+        } catch (e) {
+          console.error(`append_chunk failed (${id})`, e);
+        }
+      }
+    } finally {
+      processing.current[id] = false;
+    }
+  };
+
+  const startAll = useCallback(async () => {
+    try {
+      if (!saveDirectory) {
+        alert("保存先を設定してください。");
+        return;
+      }
+
+      // Screen
+      const getDisplayMedia = navigator.mediaDevices?.getDisplayMedia?.bind(
+        navigator.mediaDevices
+      );
+      if (!getDisplayMedia) throw new Error("getDisplayMedia not supported");
+      const screenStream = await getDisplayMedia({ video: true, audio: true });
+      screenStreamRef.current = screenStream;
+      const videoMime = pickSupportedVideoMime();
+      await invoke("init_recording", {
+        path: saveDirectory,
+        mime: videoMime,
+        id: "screen",
+      });
+      const screenMr = new MediaRecorder(
+        screenStream as MediaStream,
+        videoMime ? { mimeType: videoMime } : {}
+      );
+      screenMr.ondataavailable = async (ev: BlobEvent) => {
+        if (ev.data && ev.data.size > 0) {
+          const ab = await ev.data.arrayBuffer();
+          screenQueueRef.current.push(new Uint8Array(ab));
+          void processQueue("screen");
+        }
+      };
+      screenMrRef.current = screenMr;
+
+      // Camera (video only)
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+      cameraStreamRef.current = cameraStream;
+      await invoke("init_recording", {
+        path: saveDirectory,
+        mime: videoMime,
+        id: "camera",
+      });
+      const cameraMr = new MediaRecorder(
+        cameraStream as MediaStream,
+        videoMime ? { mimeType: videoMime } : {}
+      );
+      cameraMr.ondataavailable = async (ev: BlobEvent) => {
+        if (ev.data && ev.data.size > 0) {
+          const ab = await ev.data.arrayBuffer();
+          cameraQueueRef.current.push(new Uint8Array(ab));
+          void processQueue("camera");
+        }
+      };
+      cameraMrRef.current = cameraMr;
+
+      // Audio (microphone only)
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      audioStreamRef.current = audioStream;
+      const audioMime = pickSupportedAudioMime();
+      await invoke("init_recording", {
+        path: saveDirectory,
+        mime: audioMime,
+        id: "audio",
+      });
+      const audioMr = new MediaRecorder(
+        audioStream as MediaStream,
+        audioMime ? { mimeType: audioMime } : {}
+      );
+      audioMr.ondataavailable = async (ev: BlobEvent) => {
+        if (ev.data && ev.data.size > 0) {
+          const ab = await ev.data.arrayBuffer();
+          audioQueueRef.current.push(new Uint8Array(ab));
+          void processQueue("audio");
+        }
+      };
+      audioMrRef.current = audioMr;
+
+      // Start all
+      screenMr.start(1000);
+      cameraMr.start(1000);
+      audioMr.start(1000);
+      setRecording(true);
+    } catch (e) {
+      console.error("startAll failed", e);
+      alert("開始に失敗しました。権限や環境を確認してください。");
+    }
+  }, [saveDirectory]);
+
+  const stopAll = useCallback(async () => {
+    try {
+      screenMrRef.current?.stop();
+      cameraMrRef.current?.stop();
+      audioMrRef.current?.stop();
+
+      const waitFlush = async (id: "screen" | "camera" | "audio") => {
+        const queue =
+          id === "screen"
+            ? screenQueueRef.current
+            : id === "camera"
+            ? cameraQueueRef.current
+            : audioQueueRef.current;
+        while (processing.current[id] || queue.length > 0) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        await invoke("finalize_recording", { id });
+      };
+
+      await waitFlush("screen");
+      await waitFlush("camera");
+      await waitFlush("audio");
+
+      for (const s of [
+        screenStreamRef.current,
+        cameraStreamRef.current,
+        audioStreamRef.current,
+      ]) {
+        try {
+          s?.getTracks().forEach((t) => t.stop());
+        } catch {}
+      }
+      screenStreamRef.current = null;
+      cameraStreamRef.current = null;
+      audioStreamRef.current = null;
+      setRecording(false);
+      alert("保存が完了しました。");
+    } catch (e) {
+      console.error("stopAll failed", e);
+      alert("停止に失敗しました");
+    }
+  }, []);
+
   return {
     notificationPermission,
     canRequest,
@@ -208,5 +408,8 @@ export const useTop = () => {
     validateScreen,
     saveDirectory,
     chooseSaveDirectory,
+    recording,
+    startAll,
+    stopAll,
   } as const;
 };

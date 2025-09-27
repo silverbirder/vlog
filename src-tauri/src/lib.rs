@@ -1,13 +1,15 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use tauri::Manager;
 
-static OUTPUT_PATH: OnceCell<Mutex<Option<PathBuf>>> = OnceCell::new();
-static LAST_OUTPUT_PATH: OnceCell<Mutex<Option<PathBuf>>> = OnceCell::new();
+// Support multiple concurrent recordings keyed by an ID (e.g., "screen", "camera", "audio").
+static OUTPUT_PATHS: OnceCell<Mutex<HashMap<String, PathBuf>>> = OnceCell::new();
+// Note: previously tracked last paths for `read_recording`, now removed as unused.
 
 #[tauri::command]
 async fn get_desktop_path(app: tauri::AppHandle) -> Result<String, String> {
@@ -19,35 +21,29 @@ async fn get_desktop_path(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn append_chunk(data: Vec<u8>) -> Result<(), String> {
-    // On first call, initialize output file in desktop directory
-    // initialize the cell if needed
-    let cell = OUTPUT_PATH.get_or_init(|| Mutex::new(None));
-    let mut guard = cell.lock();
+fn append_chunk(data: Vec<u8>, id: Option<String>) -> Result<(), String> {
+    let key = id.unwrap_or_else(|| "default".to_string());
+    let map_cell = OUTPUT_PATHS.get_or_init(|| Mutex::new(HashMap::new()));
+    let map = map_cell.lock();
+    let path = map
+        .get(&key)
+        .cloned()
+        .ok_or_else(|| "output path not initialized; call init_recording first".to_string())?;
 
-    // Require explicit initialization via `init_recording` to avoid
-    // creating an incorrect default file (prevents container/extension mismatch).
-    if guard.is_none() {
-        return Err("output path not initialized; call init_recording first".into());
-    }
-
-    if let Some(ref path) = *guard {
-        let mut f = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .map_err(|e| format!("open file error: {}", e))?;
-        f.write_all(&data)
-            .map_err(|e| format!("write error: {}", e))?;
-        Ok(())
-    } else {
-        Err("output path not set".into())
-    }
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("open file error: {}", e))?;
+    f.write_all(&data)
+        .map_err(|e| format!("write error: {}", e))?;
+    Ok(())
 }
 
 #[tauri::command]
-async fn init_recording(path: String, mime: Option<String>) -> Result<String, String> {
+async fn init_recording(path: String, mime: Option<String>, id: Option<String>) -> Result<String, String> {
     let output_dir = PathBuf::from(path);
+    let key = id.unwrap_or_else(|| "default".to_string());
     let ext = if let Some(m) = mime {
         if m.contains("webm") {
             "webm"
@@ -57,26 +53,29 @@ async fn init_recording(path: String, mime: Option<String>) -> Result<String, St
     } else {
         "mp4"
     };
-    let filename = format!("vlog_recording.{}", ext);
+    let filename = if key == "default" {
+        format!("vlog_recording.{}", ext)
+    } else {
+        format!("vlog_recording_{}.{}", key, ext)
+    };
     let full_path = output_dir.join(filename);
     let _ = std::fs::remove_file(&full_path);
 
-    let cell = OUTPUT_PATH.get_or_init(|| Mutex::new(None));
-    let mut guard = cell.lock();
-    *guard = Some(full_path.clone());
+    let map_cell = OUTPUT_PATHS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut map = map_cell.lock();
+    map.insert(key.clone(), full_path.clone());
 
-    let last = LAST_OUTPUT_PATH.get_or_init(|| Mutex::new(None));
-    let mut last_guard = last.lock();
-    *last_guard = Some(full_path.clone());
+    // no-op: no last path tracking needed without `read_recording`
 
     Ok(format!("initialized: {}", full_path.display()))
 }
 
 #[tauri::command]
-fn finalize_recording() -> Result<String, String> {
-    if let Some(cell) = OUTPUT_PATH.get() {
-        let mut guard = cell.lock();
-        if let Some(path) = guard.take() {
+fn finalize_recording(id: Option<String>) -> Result<String, String> {
+    let key = id.unwrap_or_else(|| "default".to_string());
+    if let Some(cell) = OUTPUT_PATHS.get() {
+        let mut map = cell.lock();
+        if let Some(path) = map.remove(&key) {
             Ok(format!("wrote file: {}", path.display()))
         } else {
             Err("no active recording".into())
@@ -86,31 +85,7 @@ fn finalize_recording() -> Result<String, String> {
     }
 }
 
-#[tauri::command]
-fn read_recording() -> Result<Vec<u8>, String> {
-    // Try to use last known output path, fallback to default mp4
-    let mut candidate: Option<PathBuf> = None;
-    if let Some(last) = LAST_OUTPUT_PATH.get() {
-        let last_guard = last.lock();
-        if let Some(ref p) = *last_guard {
-            candidate = Some(p.clone());
-        }
-    }
-
-    let tmp = if let Some(p) = candidate {
-        p
-    } else {
-        let mut t = std::env::temp_dir();
-        t.push("vlog_recording.mp4");
-        t
-    };
-
-    if !tmp.exists() {
-        return Err("no recording found".into());
-    }
-
-    std::fs::read(&tmp).map_err(|e| format!("read error: {}", e))
-}
+// `read_recording` has been removed as it was unused.
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -124,8 +99,7 @@ pub fn run() {
             get_desktop_path,
             append_chunk,
             init_recording,
-            finalize_recording,
-            read_recording
+            finalize_recording
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
