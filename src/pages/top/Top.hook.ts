@@ -156,15 +156,10 @@ export const useTop = () => {
 
   const screenStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
-
   const screenMrRef = useRef<MediaRecorder | null>(null);
   const cameraMrRef = useRef<MediaRecorder | null>(null);
-  const audioMrRef = useRef<MediaRecorder | null>(null);
-
   const screenQueueRef = useRef<Uint8Array[]>([]);
   const cameraQueueRef = useRef<Uint8Array[]>([]);
-  const audioQueueRef = useRef<Uint8Array[]>([]);
   const processing = useRef<{ [k: string]: boolean }>({});
   const autoStopTimeoutRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
@@ -185,24 +180,11 @@ export const useTop = () => {
     return null;
   };
 
-  const pickSupportedAudioMime = (): string | null => {
-    const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
-    for (const m of candidates) {
-      if (MediaRecorder.isTypeSupported(m)) return m;
-    }
-    return null;
-  };
-
-  const processQueue = async (id: "screen" | "camera" | "audio") => {
+  const processQueue = async (id: "screen" | "camera") => {
     if (processing.current[id]) return;
     processing.current[id] = true;
     try {
-      const queue =
-        id === "screen"
-          ? screenQueueRef.current
-          : id === "camera"
-          ? cameraQueueRef.current
-          : audioQueueRef.current;
+      const queue = id === "screen" ? screenQueueRef.current : cameraQueueRef.current;
       while (queue.length > 0) {
         const chunk = queue.shift();
         if (!chunk) continue;
@@ -272,42 +254,11 @@ export const useTop = () => {
       };
       cameraMrRef.current = cameraMr;
 
-      // Audio
-      const audioConstraints: MediaStreamConstraints = {
-        audio:
-          selectedMicId && selectedMicId !== "default"
-            ? { deviceId: { exact: selectedMicId } }
-            : true,
-      };
-      const audioStream = await navigator.mediaDevices.getUserMedia(
-        audioConstraints
-      );
-      audioStreamRef.current = audioStream;
-      const audioMime = pickSupportedAudioMime();
-      await invoke("init_recording", {
-        path: saveDirectory,
-        mime: audioMime,
-        id: "audio",
-        suffix,
-      });
-      const audioMr = new MediaRecorder(
-        audioStream as MediaStream,
-        audioMime ? { mimeType: audioMime } : {}
-      );
-      audioMr.ondataavailable = async (ev: BlobEvent) => {
-        if (ev.data && ev.data.size > 0) {
-          const ab = await ev.data.arrayBuffer();
-          audioQueueRef.current.push(new Uint8Array(ab));
-          void processQueue("audio");
-        }
-      };
-      audioMrRef.current = audioMr;
-
       // Screen with Audio
       try {
         const hasScreenAudio = screenStream.getAudioTracks().length > 0;
         if (!hasScreenAudio) {
-          audioStream.getAudioTracks().forEach((t) => {
+          cameraStream.getAudioTracks().forEach((t) => {
             try {
               screenStream.addTrack(t.clone());
             } catch {
@@ -343,7 +294,6 @@ export const useTop = () => {
       // Start all
       screenMr.start(1000);
       cameraMr.start(1000);
-      audioMr.start(1000);
       setRecording(true);
 
       const mins =
@@ -386,7 +336,6 @@ export const useTop = () => {
     try {
       screenMrRef.current?.stop();
       cameraMrRef.current?.stop();
-      audioMrRef.current?.stop();
 
       if (autoStopTimeoutRef.current) {
         window.clearTimeout(autoStopTimeoutRef.current);
@@ -397,13 +346,8 @@ export const useTop = () => {
         countdownIntervalRef.current = null;
       }
 
-      const waitFlush = async (id: "screen" | "camera" | "audio") => {
-        const queue =
-          id === "screen"
-            ? screenQueueRef.current
-            : id === "camera"
-            ? cameraQueueRef.current
-            : audioQueueRef.current;
+      const waitFlush = async (id: "screen" | "camera") => {
+        const queue = id === "screen" ? screenQueueRef.current : cameraQueueRef.current;
         while (processing.current[id] || queue.length > 0) {
           await new Promise((r) => setTimeout(r, 100));
         }
@@ -412,20 +356,14 @@ export const useTop = () => {
 
       await waitFlush("screen");
       await waitFlush("camera");
-      await waitFlush("audio");
 
-      for (const s of [
-        screenStreamRef.current,
-        cameraStreamRef.current,
-        audioStreamRef.current,
-      ]) {
+      for (const s of [screenStreamRef.current, cameraStreamRef.current]) {
         try {
           s?.getTracks().forEach((t) => t.stop());
         } catch {}
       }
       screenStreamRef.current = null;
       cameraStreamRef.current = null;
-      audioStreamRef.current = null;
       setRecording(false);
       setRemainingMs(null);
       alert("保存が完了しました。");
@@ -463,7 +401,7 @@ export const useTop = () => {
   const attachAudioRef = useCallback(
     (el: HTMLAudioElement | null) => {
       if (!el) return;
-      el.srcObject = recording ? audioStreamRef.current : null;
+      el.srcObject = recording ? cameraStreamRef.current : null;
       el.muted = !monitorAudio;
       if (recording && el.srcObject && monitorAudio)
         void el.play().catch(() => {});

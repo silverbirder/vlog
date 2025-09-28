@@ -50,8 +50,6 @@ async fn init_recording(
     let ext = if let Some(m) = mime {
         if m.contains("webm") {
             "webm"
-        } else if key == "audio" {
-            "m4a"
         } else {
             "mp4"
         }
