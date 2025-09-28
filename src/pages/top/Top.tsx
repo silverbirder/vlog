@@ -35,11 +35,8 @@ export const Top = () => {
     saveDirectory,
     chooseSaveDirectory,
     recording,
-    monitorAudio,
-    setMonitorAudio,
     attachScreenRef,
     attachCameraRef,
-    attachAudioRef,
     cameraDevices,
     microphoneDevices,
     selectedCameraId,
@@ -261,7 +258,7 @@ export const Top = () => {
           <CardHeader>
             <CardTitle>ライブプレビュー</CardTitle>
             <CardDescription>
-              共有中の画面とカメラを表示します。音声モニターはデフォルトでミュートです。
+              共有中の画面とカメラを表示します。
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -280,18 +277,6 @@ export const Top = () => {
                 muted
                 autoPlay
               />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={monitorAudio}
-                  onChange={(e) => setMonitorAudio(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                音声モニター（ハウリングに注意）
-              </label>
-              <audio ref={attachAudioRef} hidden />
             </div>
           </CardContent>
         </Card>

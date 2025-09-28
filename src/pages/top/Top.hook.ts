@@ -14,7 +14,6 @@ export const useTop = () => {
     useState<NotificationPermissionStatus>("unknown");
   const [saveDirectory, setSaveDirectory] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
-  const [monitorAudio, setMonitorAudio] = useState(false);
   const [autoMinutes, setAutoMinutes] = useState<number>(15);
   const [autoSeconds, setAutoSeconds] = useState<number>(0);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
@@ -398,17 +397,6 @@ export const useTop = () => {
     [recording]
   );
 
-  const attachAudioRef = useCallback(
-    (el: HTMLAudioElement | null) => {
-      if (!el) return;
-      el.srcObject = recording ? cameraStreamRef.current : null;
-      el.muted = !monitorAudio;
-      if (recording && el.srcObject && monitorAudio)
-        void el.play().catch(() => {});
-    },
-    [recording, monitorAudio]
-  );
-
   return {
     notificationPermission,
     canRequest,
@@ -417,8 +405,6 @@ export const useTop = () => {
     saveDirectory,
     chooseSaveDirectory,
     recording,
-    monitorAudio,
-    setMonitorAudio,
     cameraDevices,
     microphoneDevices,
     selectedCameraId,
@@ -445,7 +431,6 @@ export const useTop = () => {
     remainingMs,
     attachScreenRef,
     attachCameraRef,
-    attachAudioRef,
     startAll,
     stopAll,
   } as const;
