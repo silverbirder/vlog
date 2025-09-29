@@ -278,18 +278,20 @@ export const Top = () => {
               共有中の画面とカメラを表示します。
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
+          <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
               <video
                 ref={attachScreenRef}
-                className="absolute inset-0 h-full w-full object-contain"
+                className="h-full w-full object-contain"
                 playsInline
                 muted
                 autoPlay
               />
+            </div>
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
               <video
                 ref={attachCameraRef}
-                className="absolute bottom-3 right-3 w-1/4 aspect-video rounded-md ring-2 ring-white/60 bg-black"
+                className="h-full w-full object-contain"
                 playsInline
                 muted
                 autoPlay
