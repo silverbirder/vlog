@@ -17,6 +17,14 @@ export const useTop = () => {
   const [autoMinutes, setAutoMinutes] = useState<number>(15);
   const [autoSeconds, setAutoSeconds] = useState<number>(0);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const AUTO_CONTINUE_KEY = "vlog.autoContinue" as const;
+  const [autoContinue, setAutoContinueState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AUTO_CONTINUE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>(
     []
@@ -157,12 +165,31 @@ export const useTop = () => {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenMrRef = useRef<MediaRecorder | null>(null);
   const cameraMrRef = useRef<MediaRecorder | null>(null);
-  const screenQueueRef = useRef<Uint8Array[]>([]);
-  const cameraQueueRef = useRef<Uint8Array[]>([]);
-  const processing = useRef<{ [k: string]: boolean }>({});
+  const chunkQueueRef = useRef<
+    {
+      screen: Array<{ data: Uint8Array; writerId: string }>;
+      camera: Array<{ data: Uint8Array; writerId: string }>;
+    }
+  >({ screen: [], camera: [] });
+  const queueProcessingRef = useRef<{ screen: boolean; camera: boolean }>({
+    screen: false,
+    camera: false,
+  });
+  const processingWriterRef = useRef<{ screen: string | null; camera: string | null }>(
+    { screen: null, camera: null }
+  );
+  const writerIdRef = useRef<{ screen: string | null; camera: string | null }>(
+    { screen: null, camera: null }
+  );
+  const sessionCounterRef = useRef<{ screen: number; camera: number }>({
+    screen: 0,
+    camera: 0,
+  });
   const autoStopTimeoutRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
   const autoStopAtRef = useRef<number | null>(null);
+  const autoContinueRef = useRef<boolean>(autoContinue);
+  const onAutoStopRef = useRef<() => void>(() => {});
 
   const pickSupportedVideoMime = (): string | null => {
     const candidates = [
@@ -179,162 +206,203 @@ export const useTop = () => {
     return null;
   };
 
-  const processQueue = async (id: "screen" | "camera") => {
-    if (processing.current[id]) return;
-    processing.current[id] = true;
+  const processQueue = useCallback(async (id: "screen" | "camera") => {
+    if (queueProcessingRef.current[id]) return;
+    queueProcessingRef.current[id] = true;
     try {
-      const queue = id === "screen" ? screenQueueRef.current : cameraQueueRef.current;
+      const queue = chunkQueueRef.current[id];
       while (queue.length > 0) {
         const chunk = queue.shift();
         if (!chunk) continue;
+        processingWriterRef.current[id] = chunk.writerId;
         try {
-          await invoke("append_chunk", { data: Array.from(chunk), id });
+          await invoke("append_chunk", {
+            data: Array.from(chunk.data),
+            id: chunk.writerId,
+          });
         } catch (e) {
           console.error(`append_chunk failed (${id})`, e);
+        } finally {
+          processingWriterRef.current[id] = null;
         }
       }
     } finally {
-      processing.current[id] = false;
+      queueProcessingRef.current[id] = false;
+      processingWriterRef.current[id] = null;
     }
-  };
+  }, []);
 
-  const startAll = useCallback(async () => {
-    try {
-      if (!saveDirectory) {
-        alert("保存先を設定してください。");
-        return;
+  const waitForFlush = useCallback(
+    async (id: "screen" | "camera", writerId: string | null) => {
+      if (!writerId) return;
+      const queue = chunkQueueRef.current[id];
+      const hasPending = () =>
+        processingWriterRef.current[id] === writerId ||
+        queue.some((chunk) => chunk.writerId === writerId);
+      while (hasPending()) {
+        await new Promise((r) => setTimeout(r, 50));
       }
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const suffix = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
-        now.getDate()
-      )}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(
-        now.getSeconds()
-      )}`;
-      const videoMime = pickSupportedVideoMime();
+      await invoke("finalize_recording", { id: writerId });
+    },
+    []
+  );
 
-      // Pre Screen
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
+  const generateSuffix = useCallback(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(
+      now.getHours()
+    )}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  }, []);
 
-      // Camera
-      const cameraConstraints: MediaStreamConstraints = {
-        video:
-          selectedCameraId && selectedCameraId !== "default"
-            ? { deviceId: { exact: selectedCameraId } }
-            : true,
-        audio:
-          selectedMicId && selectedMicId !== "default"
-            ? { deviceId: { exact: selectedMicId } }
-            : true,
-      };
-      const cameraStream = await navigator.mediaDevices.getUserMedia(
-        cameraConstraints
-      );
-      cameraStreamRef.current = cameraStream;
+  const calcDurationMs = useCallback(() => {
+    const mins = Number.isFinite(autoMinutes) && autoMinutes >= 0 ? autoMinutes : 15;
+    const secs = Number.isFinite(autoSeconds) && autoSeconds >= 0 ? autoSeconds : 0;
+    const totalMs = (mins * 60 + secs) * 1000;
+    return totalMs > 0 ? totalMs : 15 * 60 * 1000;
+  }, [autoMinutes, autoSeconds]);
+
+  const scheduleAutoStop = useCallback((durationMs: number) => {
+    const endAt = Date.now() + durationMs;
+    autoStopAtRef.current = endAt;
+    setRemainingMs(durationMs);
+    if (autoStopTimeoutRef.current) {
+      window.clearTimeout(autoStopTimeoutRef.current);
+    }
+    autoStopTimeoutRef.current = window.setTimeout(() => {
+      onAutoStopRef.current();
+    }, durationMs);
+    if (countdownIntervalRef.current) {
+      window.clearInterval(countdownIntervalRef.current);
+    }
+    countdownIntervalRef.current = window.setInterval(() => {
+      const nowTs = Date.now();
+      const rem = Math.max(0, endAt - nowTs);
+      setRemainingMs(rem);
+    }, 250);
+  }, []);
+
+  const setAutoContinue = useCallback((value: boolean) => {
+    autoContinueRef.current = value;
+    setAutoContinueState(value);
+    try {
+      localStorage.setItem(AUTO_CONTINUE_KEY, value ? "true" : "false");
+    } catch {}
+  }, []);
+
+  const startRecorder = useCallback(
+    async (
+      id: "screen" | "camera",
+      stream: MediaStream,
+      videoMime: string | null,
+      suffix: string
+    ) => {
+      if (!saveDirectory) throw new Error("保存先が設定されていません");
+      sessionCounterRef.current[id] += 1;
+      const writerId = `${id}-${suffix}-${sessionCounterRef.current[id]}`;
+      writerIdRef.current[id] = writerId;
       await invoke("init_recording", {
         path: saveDirectory,
         mime: videoMime,
-        id: "camera",
+        id: writerId,
         suffix,
       });
-      const cameraMr = new MediaRecorder(
-        cameraStream,
+      const recorder = new MediaRecorder(
+        stream,
         videoMime ? { mimeType: videoMime } : {}
       );
-      cameraMr.ondataavailable = async (ev: BlobEvent) => {
+      recorder.ondataavailable = async (ev: BlobEvent) => {
         if (ev.data && ev.data.size > 0) {
           const ab = await ev.data.arrayBuffer();
-          cameraQueueRef.current.push(new Uint8Array(ab));
-          void processQueue("camera");
+          const queue = chunkQueueRef.current[id];
+          const activeWriterId = writerIdRef.current[id] ?? writerId;
+          queue.push({ data: new Uint8Array(ab), writerId: activeWriterId });
+          void processQueue(id);
         }
       };
-      cameraMrRef.current = cameraMr;
+      if (id === "screen") {
+        screenMrRef.current = recorder;
+      } else {
+        cameraMrRef.current = recorder;
+      }
+      recorder.start(1000);
+    },
+    [processQueue, saveDirectory]
+  );
 
-      // Screen with Audio
+  const stopAll = useCallback(
+    async (
+      reason: "manual" | "auto" = "manual",
+      options?: { suppressAlert?: boolean }
+    ) => {
       try {
-        const hasScreenAudio = screenStream.getAudioTracks().length > 0;
-        if (!hasScreenAudio) {
-          cameraStream.getAudioTracks().forEach((t) => {
-            try {
-              screenStream.addTrack(t.clone());
-            } catch {
-              screenStream.addTrack(t);
-            }
+        const currentScreenWriter = writerIdRef.current.screen;
+        const currentCameraWriter = writerIdRef.current.camera;
+
+        screenMrRef.current?.stop();
+        cameraMrRef.current?.stop();
+
+        if (autoStopTimeoutRef.current) {
+          window.clearTimeout(autoStopTimeoutRef.current);
+          autoStopTimeoutRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+          window.clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+
+        await waitForFlush("screen", currentScreenWriter ?? null);
+        await waitForFlush("camera", currentCameraWriter ?? null);
+
+        writerIdRef.current.screen = null;
+        writerIdRef.current.camera = null;
+        chunkQueueRef.current.screen = [];
+        chunkQueueRef.current.camera = [];
+
+        for (const s of [screenStreamRef.current, cameraStreamRef.current]) {
+          try {
+            s?.getTracks().forEach((t) => t.stop());
+          } catch {}
+        }
+        screenStreamRef.current = null;
+        cameraStreamRef.current = null;
+        screenMrRef.current = null;
+        cameraMrRef.current = null;
+        autoStopAtRef.current = null;
+        setRecording(false);
+        setRemainingMs(null);
+        if (!options?.suppressAlert) {
+          alert("保存が完了しました。");
+        }
+        if (reason === "auto") {
+          void sendNotificationIfAllowed({
+            title: "録画を自動停止しました",
+            body: "設定した時間に達したため、録画を自動停止しました。",
           });
         }
       } catch (e) {
-        console.warn("Failed to attach mic audio to screen stream", e);
+        console.error("stopAll failed", e);
+        if (!options?.suppressAlert) {
+          alert("停止に失敗しました");
+        }
+      }
+    },
+    [waitForFlush]
+  );
+
+  const rotateRecording = useCallback(async () => {
+    try {
+      const screenStream = screenStreamRef.current;
+      const cameraStream = cameraStreamRef.current;
+      const screenMr = screenMrRef.current;
+      const cameraMr = cameraMrRef.current;
+      if (!screenStream || !cameraStream || !screenMr || !cameraMr) {
+        await stopAll("auto", { suppressAlert: true });
+        return;
       }
 
-      // Post Screen
-      await invoke("init_recording", {
-        path: saveDirectory,
-        mime: videoMime,
-        id: "screen",
-        suffix,
-      });
-      screenStreamRef.current = screenStream;
-      const screenMr = new MediaRecorder(
-        screenStream,
-        videoMime ? { mimeType: videoMime } : {}
-      );
-      screenMr.ondataavailable = async (ev: BlobEvent) => {
-        if (ev.data && ev.data.size > 0) {
-          const ab = await ev.data.arrayBuffer();
-          screenQueueRef.current.push(new Uint8Array(ab));
-          void processQueue("screen");
-        }
-      };
-      screenMrRef.current = screenMr;
-
-      // Start all
-      screenMr.start(1000);
-      cameraMr.start(1000);
-      setRecording(true);
-
-      const mins =
-        Number.isFinite(autoMinutes) && autoMinutes >= 0 ? autoMinutes : 15;
-      const secs =
-        Number.isFinite(autoSeconds) && autoSeconds >= 0 ? autoSeconds : 0;
-      const totalMs = (mins * 60 + secs) * 1000;
-      const durationMs = totalMs > 0 ? totalMs : 15 * 60 * 1000;
-
-      const endAt = Date.now() + durationMs;
-      autoStopAtRef.current = endAt;
-      setRemainingMs(durationMs);
-
-      if (autoStopTimeoutRef.current)
-        window.clearTimeout(autoStopTimeoutRef.current);
-      autoStopTimeoutRef.current = window.setTimeout(() => {
-        void stopAll("auto");
-      }, durationMs);
-
-      if (countdownIntervalRef.current)
-        window.clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = window.setInterval(() => {
-        const now = Date.now();
-        const rem = Math.max(0, endAt - now);
-        setRemainingMs(rem);
-      }, 250);
-    } catch (e) {
-      console.error("startAll failed", e);
-      alert("開始に失敗しました。権限や環境を確認してください。");
-    }
-  }, [
-    saveDirectory,
-    autoMinutes,
-    autoSeconds,
-    selectedCameraId,
-    selectedMicId,
-  ]);
-
-  const stopAll = useCallback(async (reason: "manual" | "auto" = "manual") => {
-    try {
-      screenMrRef.current?.stop();
-      cameraMrRef.current?.stop();
+      const previousScreenWriter = writerIdRef.current.screen;
+      const previousCameraWriter = writerIdRef.current.camera;
 
       if (autoStopTimeoutRef.current) {
         window.clearTimeout(autoStopTimeoutRef.current);
@@ -345,38 +413,153 @@ export const useTop = () => {
         countdownIntervalRef.current = null;
       }
 
-      const waitFlush = async (id: "screen" | "camera") => {
-        const queue = id === "screen" ? screenQueueRef.current : cameraQueueRef.current;
-        while (processing.current[id] || queue.length > 0) {
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        await invoke("finalize_recording", { id });
-      };
+      const waitForStop = (recorder: MediaRecorder | null) =>
+        new Promise<void>((resolve) => {
+          if (!recorder || recorder.state === "inactive") {
+            resolve();
+            return;
+          }
+          const handleStop = () => {
+            recorder.removeEventListener("stop", handleStop);
+            resolve();
+          };
+          recorder.addEventListener("stop", handleStop, { once: true });
+          recorder.stop();
+        });
 
-      await waitFlush("screen");
-      await waitFlush("camera");
+      await Promise.all([waitForStop(screenMr), waitForStop(cameraMr)]);
 
-      for (const s of [screenStreamRef.current, cameraStreamRef.current]) {
-        try {
-          s?.getTracks().forEach((t) => t.stop());
-        } catch {}
+      const videoMime = pickSupportedVideoMime();
+      const suffix = generateSuffix();
+
+      await startRecorder("camera", cameraStream, videoMime, suffix);
+      await startRecorder("screen", screenStream, videoMime, suffix);
+
+      const durationMs = calcDurationMs();
+      scheduleAutoStop(durationMs);
+
+      await Promise.all([
+        waitForFlush("screen", previousScreenWriter ?? null),
+        waitForFlush("camera", previousCameraWriter ?? null),
+      ]);
+
+      void sendNotificationIfAllowed({
+        title: "録画を自動保存しました",
+        body: "設定時間に達したため保存し、録画を継続しています。",
+      });
+    } catch (e) {
+      console.error("rotateRecording failed", e);
+      alert("録画の継続に失敗したため、録画を停止しました。");
+      await stopAll("manual", { suppressAlert: true });
+    }
+  }, [
+    calcDurationMs,
+    generateSuffix,
+    scheduleAutoStop,
+    startRecorder,
+    stopAll,
+    waitForFlush,
+    sendNotificationIfAllowed,
+  ]);
+
+  useEffect(() => {
+    onAutoStopRef.current = () => {
+      if (autoContinueRef.current) {
+        void rotateRecording();
+      } else {
+        void stopAll("auto");
       }
+    };
+  }, [rotateRecording, stopAll]);
+
+  const startAll = useCallback(async () => {
+    let screenStream: MediaStream | null = null;
+    let cameraStream: MediaStream | null = null;
+    try {
+      if (!saveDirectory) {
+        alert("保存先を設定してください。");
+        return;
+      }
+      chunkQueueRef.current.screen = [];
+      chunkQueueRef.current.camera = [];
+      writerIdRef.current.screen = null;
+      writerIdRef.current.camera = null;
+      const videoMime = pickSupportedVideoMime();
+
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      const cameraConstraints: MediaStreamConstraints = {
+        video:
+          selectedCameraId && selectedCameraId !== "default"
+            ? { deviceId: { exact: selectedCameraId } }
+            : true,
+        audio:
+          selectedMicId && selectedMicId !== "default"
+            ? { deviceId: { exact: selectedMicId } }
+            : true,
+      };
+      cameraStream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
+
+      cameraStreamRef.current = cameraStream;
+      screenStreamRef.current = screenStream;
+
+      if (screenStream) {
+        const targetScreen = screenStream;
+        try {
+          const hasScreenAudio = targetScreen.getAudioTracks().length > 0;
+          if (!hasScreenAudio) {
+            cameraStream.getAudioTracks().forEach((t) => {
+              try {
+                targetScreen.addTrack(t.clone());
+              } catch {
+                targetScreen.addTrack(t);
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Failed to attach mic audio to screen stream", e);
+        }
+      }
+
+      const suffix = generateSuffix();
+
+      await startRecorder("camera", cameraStream, videoMime, suffix);
+      await startRecorder("screen", screenStream, videoMime, suffix);
+
+      setRecording(true);
+
+      const durationMs = calcDurationMs();
+      scheduleAutoStop(durationMs);
+    } catch (e) {
+      console.error("startAll failed", e);
+      screenStream?.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {}
+      });
+      cameraStream?.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {}
+      });
       screenStreamRef.current = null;
       cameraStreamRef.current = null;
-      setRecording(false);
-      setRemainingMs(null);
-      alert("保存が完了しました。");
-      if (reason === "auto") {
-        void sendNotificationIfAllowed({
-          title: "録画を自動停止しました",
-          body: "設定した時間に達したため、録画を自動停止しました。",
-        });
-      }
-    } catch (e) {
-      console.error("stopAll failed", e);
-      alert("停止に失敗しました");
+      screenMrRef.current = null;
+      cameraMrRef.current = null;
+      alert("開始に失敗しました。権限や環境を確認してください。");
     }
-  }, []);
+  }, [
+    calcDurationMs,
+    generateSuffix,
+    saveDirectory,
+    scheduleAutoStop,
+    selectedCameraId,
+    selectedMicId,
+    startRecorder,
+  ]);
 
   // Live preview attachers (used as callback refs in JSX)
   const attachScreenRef = useCallback(
@@ -426,8 +609,10 @@ export const useTop = () => {
     refreshDevices,
     autoMinutes,
     autoSeconds,
+    autoContinue,
     setAutoMinutes,
     setAutoSeconds,
+    setAutoContinue,
     remainingMs,
     attachScreenRef,
     attachCameraRef,

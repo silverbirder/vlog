@@ -46,8 +46,10 @@ export const Top = () => {
     refreshDevices,
     autoMinutes,
     autoSeconds,
+    autoContinue,
     setAutoMinutes,
     setAutoSeconds,
+    setAutoContinue,
     remainingMs,
     startAll,
     stopAll,
@@ -248,6 +250,21 @@ export const Top = () => {
                   />
                   <span className="text-sm text-muted-foreground">秒</span>
                 </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-24 text-sm text-muted-foreground">
+                  連続保存
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={autoContinue}
+                    onChange={(e) => setAutoContinue(e.target.checked)}
+                  />
+                  自動停止後も録画を継続
+                </label>
               </div>
             </div>
           </CardContent>
