@@ -53,6 +53,9 @@ export const Top = () => {
     remainingMs,
     startAll,
     stopAll,
+    pipEnabled,
+    setPipEnabled,
+    pipActive,
   } = useTop();
 
   const notifVariant =
@@ -61,6 +64,29 @@ export const Top = () => {
       : notificationPermission === "denied"
       ? "destructive"
       : "secondary";
+
+  if (pipActive) {
+    return (
+      <div className="relative flex h-screen w-screen items-center justify-center bg-black">
+        <video
+          ref={attachCameraRef}
+          className="h-full w-full object-cover"
+          playsInline
+          muted
+          autoPlay
+        />
+        <div className="absolute bottom-3 right-3 flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setPipEnabled(false)}
+          >
+            PiP解除
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:py-14">
@@ -264,6 +290,21 @@ export const Top = () => {
                     onChange={(e) => setAutoContinue(e.target.checked)}
                   />
                   自動停止後も録画を継続
+                </label>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-24 text-sm text-muted-foreground">
+                  前面表示
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={pipEnabled}
+                    onChange={(e) => setPipEnabled(e.target.checked)}
+                  />
+                  録画中にカメラを常時前面に表示
                 </label>
               </div>
             </div>

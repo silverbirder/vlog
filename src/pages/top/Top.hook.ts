@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import {
   type NotificationPermissionStatus,
   notificationPermissionStatus,
@@ -39,6 +41,25 @@ export const useTop = () => {
   const SAVE_DIR_KEY = "vlog.saveDir" as const;
   const CAMERA_ID_KEY = "vlog.cameraId" as const;
   const MIC_ID_KEY = "vlog.micId" as const;
+  const PIP_ENABLED_KEY = "vlog.pipEnabled" as const;
+  const [pipEnabled, setPipEnabledState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(PIP_ENABLED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [pipActive, setPipActiveState] = useState(false);
+  const pipWindowStateRef = useRef<{
+    size: { width: number; height: number };
+    position: { x: number; y: number };
+    decorations: boolean;
+    alwaysOnTop: boolean;
+  } | null>(null);
+  const pipActiveRef = useRef(false);
+  const appWindowRef = useRef(getCurrentWindow());
+  const recordingRef = useRef(recording);
+  const pipTransitionTokenRef = useRef(0);
 
   useEffect(() => {
     const fetchPermissionStatus = async () => {
@@ -133,6 +154,10 @@ export const useTop = () => {
     }
   }, [cameraDevices, microphoneDevices]);
 
+  useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
+
   const requestNotificationPermission = useCallback(async () => {
     const status = await ensureNotificationPermissionStatus();
     setNotificationPermission(status);
@@ -165,22 +190,22 @@ export const useTop = () => {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenMrRef = useRef<MediaRecorder | null>(null);
   const cameraMrRef = useRef<MediaRecorder | null>(null);
-  const chunkQueueRef = useRef<
-    {
-      screen: Array<{ data: Uint8Array; writerId: string }>;
-      camera: Array<{ data: Uint8Array; writerId: string }>;
-    }
-  >({ screen: [], camera: [] });
+  const chunkQueueRef = useRef<{
+    screen: Array<{ data: Uint8Array; writerId: string }>;
+    camera: Array<{ data: Uint8Array; writerId: string }>;
+  }>({ screen: [], camera: [] });
   const queueProcessingRef = useRef<{ screen: boolean; camera: boolean }>({
     screen: false,
     camera: false,
   });
-  const processingWriterRef = useRef<{ screen: string | null; camera: string | null }>(
-    { screen: null, camera: null }
-  );
-  const writerIdRef = useRef<{ screen: string | null; camera: string | null }>(
-    { screen: null, camera: null }
-  );
+  const processingWriterRef = useRef<{
+    screen: string | null;
+    camera: string | null;
+  }>({ screen: null, camera: null });
+  const writerIdRef = useRef<{ screen: string | null; camera: string | null }>({
+    screen: null,
+    camera: null,
+  });
   const sessionCounterRef = useRef<{ screen: number; camera: number }>({
     screen: 0,
     camera: 0,
@@ -250,14 +275,16 @@ export const useTop = () => {
   const generateSuffix = useCallback(() => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(
-      now.getHours()
-    )}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+      now.getDate()
+    )}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   }, []);
 
   const calcDurationMs = useCallback(() => {
-    const mins = Number.isFinite(autoMinutes) && autoMinutes >= 0 ? autoMinutes : 15;
-    const secs = Number.isFinite(autoSeconds) && autoSeconds >= 0 ? autoSeconds : 0;
+    const mins =
+      Number.isFinite(autoMinutes) && autoMinutes >= 0 ? autoMinutes : 15;
+    const secs =
+      Number.isFinite(autoSeconds) && autoSeconds >= 0 ? autoSeconds : 0;
     const totalMs = (mins * 60 + secs) * 1000;
     return totalMs > 0 ? totalMs : 15 * 60 * 1000;
   }, [autoMinutes, autoSeconds]);
@@ -288,6 +315,145 @@ export const useTop = () => {
     try {
       localStorage.setItem(AUTO_CONTINUE_KEY, value ? "true" : "false");
     } catch {}
+  }, []);
+
+  const setPipEnabled = useCallback((value: boolean) => {
+    setPipEnabledState(value);
+    try {
+      localStorage.setItem(PIP_ENABLED_KEY, value ? "true" : "false");
+    } catch {}
+  }, []);
+
+  const captureWindowState = useCallback(async () => {
+    const appWindow = appWindowRef.current;
+    try {
+      const [position, size, decorations, alwaysOnTop, scaleFactor] =
+        await Promise.all([
+          appWindow.outerPosition(),
+          appWindow.innerSize(),
+          appWindow.isDecorated(),
+          appWindow.isAlwaysOnTop(),
+          appWindow.scaleFactor(),
+        ]);
+      pipWindowStateRef.current = {
+        position: {
+          x: position.x / scaleFactor,
+          y: position.y / scaleFactor,
+        },
+        size: {
+          width: size.width / scaleFactor,
+          height: size.height / scaleFactor,
+        },
+        decorations,
+        alwaysOnTop,
+      };
+    } catch (error) {
+      console.warn("captureWindowState failed", error);
+      pipWindowStateRef.current = null;
+    }
+  }, []);
+
+  const enterPipMode = useCallback(async () => {
+    if (!pipEnabled || pipActiveRef.current) return;
+    if (typeof window === "undefined") return;
+    if (!recordingRef.current) return;
+    const token = (pipTransitionTokenRef.current += 1);
+    const appWindow = appWindowRef.current;
+    try {
+      if (!pipWindowStateRef.current) {
+        await captureWindowState();
+      }
+      if (!pipWindowStateRef.current) return;
+
+      const pipWidth = 360;
+      const pipHeight = 202;
+      const margin = 16;
+
+      const screenObj = window.screen as Screen & {
+        availLeft?: number;
+        availTop?: number;
+      };
+      const availWidth = screenObj?.availWidth ?? window.innerWidth;
+      const availHeight = screenObj?.availHeight ?? window.innerHeight;
+      const availLeft =
+        typeof screenObj?.availLeft === "number" ? screenObj.availLeft : 0;
+      const availTop =
+        typeof screenObj?.availTop === "number" ? screenObj.availTop : 0;
+
+      const targetX = availLeft + availWidth - pipWidth - margin;
+      const targetY = availTop + availHeight - pipHeight - margin;
+
+      await appWindow.setDecorations(false);
+      await appWindow.setAlwaysOnTop(true);
+      await appWindow.setSize(new LogicalSize(pipWidth, pipHeight));
+      await appWindow.setPosition(
+        new LogicalPosition(
+          Math.max(margin, targetX),
+          Math.max(margin, targetY)
+        )
+      );
+
+      if (
+        pipTransitionTokenRef.current !== token ||
+        !recordingRef.current ||
+        !pipWindowStateRef.current
+      ) {
+        return;
+      }
+
+      pipActiveRef.current = true;
+      setPipActiveState(true);
+    } catch (error) {
+      console.error("enterPipMode failed", error);
+      pipActiveRef.current = false;
+      pipWindowStateRef.current = null;
+      try {
+        await appWindow.setAlwaysOnTop(false);
+      } catch {}
+      try {
+        await appWindow.setDecorations(true);
+      } catch {}
+    }
+  }, [captureWindowState, pipEnabled]);
+
+  const exitPipMode = useCallback(async () => {
+    pipTransitionTokenRef.current += 1;
+    if (!pipActiveRef.current && !pipWindowStateRef.current) return;
+    const appWindow = appWindowRef.current;
+    const original = pipWindowStateRef.current;
+    pipActiveRef.current = false;
+    setPipActiveState(false);
+    try {
+      if (original) {
+        try {
+          await appWindow.setDecorations(original.decorations);
+        } catch {}
+        try {
+          await appWindow.setSize(
+            new LogicalSize(original.size.width, original.size.height)
+          );
+        } catch {}
+        try {
+          await appWindow.setPosition(
+            new LogicalPosition(original.position.x, original.position.y)
+          );
+        } catch {}
+        try {
+          await appWindow.setAlwaysOnTop(original.alwaysOnTop);
+        } catch {}
+      } else {
+        try {
+          await appWindow.setDecorations(true);
+        } catch {}
+        try {
+          await appWindow.setAlwaysOnTop(false);
+        } catch {}
+      }
+    } catch (error) {
+      console.error("exitPipMode failed", error);
+    } finally {
+      pipWindowStateRef.current = null;
+    }
   }, []);
 
   const startRecorder = useCallback(
@@ -385,9 +551,11 @@ export const useTop = () => {
         if (!options?.suppressAlert) {
           alert("停止に失敗しました");
         }
+      } finally {
+        await exitPipMode();
       }
     },
-    [waitForFlush]
+    [exitPipMode, sendNotificationIfAllowed, waitForFlush]
   );
 
   const rotateRecording = useCallback(async () => {
@@ -480,6 +648,9 @@ export const useTop = () => {
         alert("保存先を設定してください。");
         return;
       }
+      if (!pipWindowStateRef.current) {
+        await captureWindowState();
+      }
       chunkQueueRef.current.screen = [];
       chunkQueueRef.current.camera = [];
       writerIdRef.current.screen = null;
@@ -501,7 +672,9 @@ export const useTop = () => {
             ? { deviceId: { exact: selectedMicId } }
             : true,
       };
-      cameraStream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
+      cameraStream = await navigator.mediaDevices.getUserMedia(
+        cameraConstraints
+      );
 
       cameraStreamRef.current = cameraStream;
       screenStreamRef.current = screenStream;
@@ -531,6 +704,12 @@ export const useTop = () => {
 
       setRecording(true);
 
+      if (pipEnabled) {
+        await enterPipMode();
+      } else {
+        await exitPipMode();
+      }
+
       const durationMs = calcDurationMs();
       scheduleAutoStop(durationMs);
     } catch (e) {
@@ -553,7 +732,11 @@ export const useTop = () => {
     }
   }, [
     calcDurationMs,
+    captureWindowState,
+    enterPipMode,
+    exitPipMode,
     generateSuffix,
+    pipEnabled,
     saveDirectory,
     scheduleAutoStop,
     selectedCameraId,
@@ -579,6 +762,24 @@ export const useTop = () => {
     },
     [recording]
   );
+
+  useEffect(() => {
+    if (!recording) {
+      void exitPipMode();
+      return;
+    }
+    if (pipEnabled) {
+      void enterPipMode();
+    } else {
+      void exitPipMode();
+    }
+  }, [enterPipMode, exitPipMode, pipEnabled, recording]);
+
+  useEffect(() => {
+    return () => {
+      void exitPipMode();
+    };
+  }, [exitPipMode]);
 
   return {
     notificationPermission,
@@ -614,6 +815,9 @@ export const useTop = () => {
     setAutoSeconds,
     setAutoContinue,
     remainingMs,
+    pipEnabled,
+    setPipEnabled,
+    pipActive,
     attachScreenRef,
     attachCameraRef,
     startAll,
