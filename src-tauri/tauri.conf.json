@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "vlog",
+  "productName": "VLog",
   "version": "0.1.0",
   "identifier": "com.silverbirder.vlog",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "vlog",
+        "title": "VLog",
         "width": 800,
         "height": 600
       }
