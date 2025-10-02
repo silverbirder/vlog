@@ -80,9 +80,6 @@ export const Top = () => {
           autoPlay
           data-tauri-drag-region=""
         />
-        <div className="pointer-events-none absolute left-3 top-3 text-xs font-medium text-white/70">
-          ドラッグでウィンドウ移動
-        </div>
         <div
           className="absolute bottom-3 right-3 flex gap-2"
           data-no-drag=""
