@@ -106,7 +106,7 @@ export const Top = () => {
       <section className="mb-10 text-center">
         <H1 className="mt-4">Vlog Recorder</H1>
         <Lead className="mt-2">
-          スクリーン・カメラ・マイクを同時に記録。シンプル操作で素早く収録。
+          スクリーン・カメラを同時に記録。シンプル操作で素早く収録。
         </Lead>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button

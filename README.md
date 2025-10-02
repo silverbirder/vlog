@@ -1,31 +1,45 @@
-# Tauri + React + Typescript
+# Vlog Recorder
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Vlog Recorder は、スクリーン・カメラを同時に記録できる macOS 向けデスクトップアプリです。ピクチャ・イン・ピクチャでの常時前面表示、自動停止や連続保存といった録画を助ける機能を備え、動画ブログやリモートワークに最適です。
 
-## Recommended IDE Setup
+## 対応プラットフォーム
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- macOS 15 Sequoia 以降（Apple Silicon)
 
-## Appium を使ったローカルE2Eテスト
+## 必要なもの
 
-最小構成の Appium テスト (`src/tests/appium/basic.e2e.ts`) を追加しています。macOS 上でローカル実行する際の手順は以下です。
+- Node.js 20 以上
+- Rust (stable)
 
-1. 依存パッケージを取得し、デバッグビルドを用意
-   ```bash
-   npm install
-   npm run tauri:build
-   ```
-2. 1回だけ Appium 本体 (v3 以上) と Mac2 ドライバをセットアップ
-   ```bash
-   npx appium driver install mac2
-   ```
-3. 別ターミナルで Appium サーバーを起動
-   ```bash
-   npx appium --port 4723
-   ```
-4. テストを実行（ヘッダー表示→開始ボタン押下→停止ボタンでの停止まで確認）
-   ```bash
-   npm run appium:test
-   ```
+Tauri 公式ドキュメントの [必要事項 | Tauri](https://v2.tauri.app/ja/start/prerequisites/) も参照してください。
 
-デフォルトでは `src-tauri/target/debug/bundle/macos/vlog.app` を起動対象とします。異なるパスを使いたい場合は `APP_PATH=/path/to/app.app npm run appium:test` のように環境変数で上書きしてください。バンドルIDを変更している場合は `BUNDLE_ID` も同様に指定できます。また、古いバージョンの Appium がグローバルに入っている場合は `npx appium@latest …` あるいはプロジェクトローカルの `node_modules/.bin/appium` を直接指定して実行してください。
+## インストール手順（macOS）
+
+1. プロジェクトを取得します。
+
+```bash
+git clone https://github.com/silverbirder/vlog.git
+cd vlog
+```
+
+2. 依存パッケージをインストールします。
+
+```bash
+npm install
+```
+
+3. macOS アプリをビルドしてバンドルを生成します。`npm run tauri:build` は `.app` や `.dmg` を含むバンドルを作成します。
+
+```bash
+npm run tauri:build
+```
+
+成果物は `src-tauri/target/release/bundle/macos/` に出力されます。
+
+4. 生成した `.dmg` を開き、アプリを `Applications` フォルダへドラッグするとインストール完了です。
+
+5. インストール後、アプリケーションフォルダから **Vlog** を起動し、保存先フォルダやデバイスを設定して録画を開始します。
+
+## お問い合わせ
+
+不明点があれば Issues や Pull Request でお知らせください。
