@@ -25,7 +25,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-
 export const Top = () => {
   const {
     notificationPermission,
@@ -56,6 +55,7 @@ export const Top = () => {
     pipEnabled,
     setPipEnabled,
     pipActive,
+    handlePipPointerDown,
   } = useTop();
 
   const notifVariant =
@@ -67,19 +67,33 @@ export const Top = () => {
 
   if (pipActive) {
     return (
-      <div className="relative flex h-screen w-screen items-center justify-center bg-black">
+      <div
+        className="relative flex h-screen w-screen cursor-move items-center justify-center bg-black"
+        data-tauri-drag-region=""
+        onPointerDown={handlePipPointerDown}
+      >
         <video
           ref={attachCameraRef}
           className="h-full w-full object-cover"
           playsInline
           muted
           autoPlay
+          data-tauri-drag-region=""
         />
-        <div className="absolute bottom-3 right-3 flex gap-2">
+        <div className="pointer-events-none absolute left-3 top-3 text-xs font-medium text-white/70">
+          ドラッグでウィンドウ移動
+        </div>
+        <div
+          className="absolute bottom-3 right-3 flex gap-2"
+          data-no-drag=""
+          data-tauri-drag-region="false"
+        >
           <Button
             size="sm"
             variant="secondary"
             onClick={() => setPipEnabled(false)}
+            data-no-drag=""
+            data-tauri-drag-region="false"
           >
             PiP解除
           </Button>

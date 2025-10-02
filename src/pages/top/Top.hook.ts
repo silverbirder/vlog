@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -60,6 +61,20 @@ export const useTop = () => {
   const appWindowRef = useRef(getCurrentWindow());
   const recordingRef = useRef(recording);
   const pipTransitionTokenRef = useRef(0);
+
+  const handlePipPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const appWindow = appWindowRef.current;
+      if (!appWindow) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-no-drag]")) return;
+      event.preventDefault();
+      appWindow
+        .startDragging()
+        .catch((error) => console.warn("startDragging failed", error));
+    },
+    []
+  );
 
   useEffect(() => {
     const fetchPermissionStatus = async () => {
@@ -818,6 +833,7 @@ export const useTop = () => {
     pipEnabled,
     setPipEnabled,
     pipActive,
+    handlePipPointerDown,
     attachScreenRef,
     attachCameraRef,
     startAll,
