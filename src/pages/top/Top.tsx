@@ -17,6 +17,7 @@ import {
   Play,
   Square,
   RefreshCcw,
+  X,
 } from "lucide-react";
 import {
   Select,
@@ -81,18 +82,19 @@ export const Top = () => {
           data-tauri-drag-region=""
         />
         <div
-          className="absolute bottom-3 right-3 flex gap-2"
+          className="absolute top-3 right-3 flex gap-2"
           data-no-drag=""
           data-tauri-drag-region="false"
         >
           <Button
             size="sm"
-            variant="secondary"
+            variant="ghost"
             onClick={() => setPipEnabled(false)}
             data-no-drag=""
             data-tauri-drag-region="false"
+            aria-label="ピクチャインピクチャを終了"
           >
-            PiP解除
+            <X className="h-2 w-2" aria-hidden="true" />
           </Button>
         </div>
       </div>
