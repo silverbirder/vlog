@@ -19,24 +19,24 @@ Tauri 公式ドキュメントの [必要事項 | Tauri](https://v2.tauri.app/ja
 
 1. プロジェクトを取得します。
 
-```bash
-git clone https://github.com/silverbirder/vlog.git
-cd vlog
-```
+   ```bash
+   git clone https://github.com/silverbirder/vlog.git
+   cd vlog
+   ```
 
 2. 依存パッケージをインストールします。
 
-```bash
-npm install
-```
+   ```bash
+    install
+   ```
 
 3. macOS アプリをビルドしてバンドルを生成します。`npm run tauri:build` は `.app` や `.dmg` を含むバンドルを作成します。
 
-```bash
-npm run tauri:build
-```
+   ```bash
+   npm run tauri:build
+   ```
 
-成果物は `src-tauri/target/release/bundle/macos/` に出力されます。
+   成果物は `src-tauri/target/release/bundle/macos/` に出力されます。
 
 4. 生成した `.dmg` を開き、アプリを `Applications` フォルダへドラッグするとインストール完了です。
 
