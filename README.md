@@ -27,7 +27,7 @@ Tauri 公式ドキュメントの [必要事項 | Tauri](https://v2.tauri.app/ja
 2. 依存パッケージをインストールします。
 
    ```bash
-    install
+   npm install
    ```
 
 3. macOS アプリをビルドしてバンドルを生成します。`npm run tauri:build` は `.app` や `.dmg` を含むバンドルを作成します。
@@ -41,6 +41,28 @@ Tauri 公式ドキュメントの [必要事項 | Tauri](https://v2.tauri.app/ja
 4. 生成した `.dmg` を開き、アプリを `Applications` フォルダへドラッグするとインストール完了です。
 
 5. インストール後、アプリケーションフォルダから **Vlog** を起動し、保存先フォルダやデバイスを設定して録画を開始します。
+
+## リリースと配布
+
+GitHub Releases で `.dmg` を自動生成・公開するために、`release-macos-dmg` ワークフローを追加しています。
+
+### セットアップ
+
+1. GitHub リポジトリの **Settings > Secrets and variables > Actions** から以下を設定します。
+    - `TAURI_PRIVATE_KEY` / `TAURI_KEY_PASSWORD` (任意)：Apple notarization やコード署名用のキー。未設定でもビルドはできますが、macOS で実行時に警告が表示されます。
+2. リポジトリに push されたタグ `v*` をトリガーに、macOS 向け DMG をビルドしてリリースを作成します。
+
+### 使い方
+
+- タグを作成して push すると自動的にビルドが走ります。
+
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+- 手動実行も可能です。GitHub Actions 画面から `Run workflow` を選び、既存タグ名を入力します。
+- 成功すると GitHub Releases に `.dmg` が添付されたリリースが作成されます。
 
 ## お問い合わせ
 

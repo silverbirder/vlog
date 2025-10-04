@@ -1,0 +1,92 @@
+name: Release macOS DMG
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to build and release (must exist)"
+        required: true
+        type: string
+      release_name:
+        description: "Release title (defaults to VLog <tag>)"
+        required: false
+        type: string
+      release_body:
+        description: "Release notes body"
+        required: false
+        type: string
+
+jobs:
+  build-release:
+    name: Build and publish DMG
+    runs-on: macos-14
+    permissions:
+      contents: write
+    env:
+      CI: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Resolve release metadata
+        id: release_meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+          INPUT_RELEASE_BODY: ${{ inputs.release_body }}
+        run: |
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ -z "${INPUT_TAG}" ]]; then
+              echo "::error title=Missing tag::A tag must be provided when running manually." >&2
+              exit 1
+            fi
+            echo "tag=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+            if [[ -n "${INPUT_RELEASE_NAME}" ]]; then
+              echo "name=${INPUT_RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+            else
+              echo "name=VLog ${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ -n "${INPUT_RELEASE_BODY}" ]]; then
+              echo "body=${INPUT_RELEASE_BODY}" >> "$GITHUB_OUTPUT"
+            else
+              echo "body=Automated macOS DMG build for ${INPUT_TAG}." >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "name=VLog ${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "body=Automated macOS DMG build for ${GITHUB_REF_NAME}." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and publish DMG with Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          projectPath: .
+          tauriScript: npm run tauri:build
+          releaseName: ${{ steps.release_meta.outputs.name }}
+          tagName: ${{ steps.release_meta.outputs.tag }}
+          releaseBody: ${{ steps.release_meta.outputs.body }}
+          prerelease: false
+          draft: false
+          bundles: dmg
