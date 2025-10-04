@@ -88,5 +88,4 @@ jobs:
           tagName: ${{ steps.release_meta.outputs.tag }}
           releaseBody: ${{ steps.release_meta.outputs.body }}
           prerelease: false
-          draft: false
-          bundles: dmg
+          releaseDraft: false
