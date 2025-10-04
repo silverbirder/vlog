@@ -30,7 +30,7 @@ Tauri 公式ドキュメントの [必要事項 | Tauri](https://v2.tauri.app/ja
    npm install
    ```
 
-3. macOS アプリをビルドしてバンドルを生成します。`npm run tauri:build` は `.app` や `.dmg` を含むバンドルを作成します。
+3. macOS アプリをビルドしてバンドルを生成します。`npm run tauri:build` は `.dmg` バンドルのみを作成します。
 
    ```bash
    npm run tauri:build

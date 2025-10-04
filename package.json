@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build --no-bundle && tauri bundle --bundles app,dmg",
+  "tauri:build": "tauri build --bundles dmg",
     "appium:test": "tsx src/tests/appium/basic.e2e.ts",
     "check": "biome check --write src/"
   },

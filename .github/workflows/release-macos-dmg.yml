@@ -83,9 +83,10 @@ jobs:
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           projectPath: .
-          tauriScript: npm run tauri:build
+          tauriScript: npm run tauri
           releaseName: ${{ steps.release_meta.outputs.name }}
           tagName: ${{ steps.release_meta.outputs.tag }}
           releaseBody: ${{ steps.release_meta.outputs.body }}
           prerelease: false
           releaseDraft: false
+          args: --bundles dmg
