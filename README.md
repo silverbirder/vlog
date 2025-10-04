@@ -3,6 +3,7 @@
 Vlog Recorder は、スクリーン・カメラを同時に記録できる macOS 向けデスクトップアプリです。ピクチャ・イン・ピクチャでの常時前面表示、自動停止や連続保存といった録画を助ける機能を備え、動画ブログやリモートワークに最適です。
 
 ![vlog-intro-1](./assets/vlog-intro-1.png)
+![vlog-intro-2](./assets/vlog-intro-2.png)
 
 ## 対応プラットフォーム
 
