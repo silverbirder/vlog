@@ -64,6 +64,21 @@ GitHub Releases で `.dmg` を自動生成・公開するために、`release-ma
 - 手動実行も可能です。GitHub Actions 画面から `Run workflow` を選び、既存タグ名を入力します。
 - 成功すると GitHub Releases に `.dmg` が添付されたリリースが作成されます。
 
+### 初回起動時の警告について
+
+Apple Developer ID での署名・公証を行っていないため、ダウンロード直後に起動しようとすると Gatekeeper により「破損している可能性がある」等の警告が表示される場合があります。以下のいずれかの方法で回避できます。
+
+1. Finder でアプリを右クリックし「開く」を選び、表示されるダイアログで再度「開く」を押す。
+2. アプリを `/Applications` フォルダへコピーした上で、ターミナルから隔離属性を削除する。
+
+   ```bash
+   sudo xattr -dr com.apple.quarantine /Applications/VLog.app
+   ```
+
+   `/Applications` 以外に置いた場合はパスを書き換えてください。`Permission denied` が出る場合は `sudo` を付与します。
+
+3. （配布者向け）Apple Developer ID を取得してコード署名・公証を行うと、警告なしで起動できます。
+
 ## お問い合わせ
 
 不明点があれば Issues や Pull Request でお知らせください。
