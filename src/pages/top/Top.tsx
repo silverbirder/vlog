@@ -26,6 +26,13 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+
+const formatRemaining = (ms: number) => {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
 export const Top = () => {
   const {
     notificationPermission,
@@ -129,7 +136,7 @@ export const Top = () => {
         </div>
         {recording && typeof remainingMs === "number" ? (
           <div className="mt-3 text-sm text-muted-foreground">
-            自動停止まで {new Date(remainingMs).toISOString().substring(14, 19)}
+            自動停止まで {formatRemaining(remainingMs)}
           </div>
         ) : null}
       </section>
