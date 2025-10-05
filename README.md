@@ -73,7 +73,7 @@ Apple Developer ID での署名・公証を行っていないため、ダウン�
 2. アプリを `/Applications` フォルダへコピーした上で、ターミナルから隔離属性を削除する。
 
    ```bash
-   sudo xattr -dr com.apple.quarantine /Applications/VLog.app
+   xattr -dr com.apple.quarantine /Applications/VLog.app
    ```
 
    `/Applications` 以外に置いた場合はパスを書き換えてください。`Permission denied` が出る場合は `sudo` を付与します。
